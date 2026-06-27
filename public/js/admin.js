@@ -1596,7 +1596,12 @@
         <form id="inspForm">
           <div class="form-row">
             <div class="field"><label>Titre</label><input name="title" placeholder="ex: Smart casual hiver" required></div>
-            <div class="field" style="grid-column:span 2"><label>Image principale (URL — le look complet)</label><input name="main_image" type="url"></div>
+            <div class="field" style="grid-column:span 2">
+              <label>Image principale (le look complet)</label>
+              <input name="main_image" type="hidden" id="inspMainInput">
+              <div id="inspMainDrop"></div>
+              <input id="inspMainUrl" type="url" placeholder="…ou collez une URL" style="margin-top:6px;background:transparent;border:none;border-bottom:1px dotted var(--hairline-strong);font-size:12px;color:var(--muted);padding:6px 0;width:100%;">
+            </div>
           </div>
           <div style="margin-top:14px;"><button class="btn" type="submit">Créer</button></div>
         </form>
@@ -1604,6 +1609,15 @@
 
       <div id="inspList"></div>
     `;
+
+    const inspMainInput = $('#inspMainInput');
+    const inspMainDrop  = $('#inspMainDrop');
+    const inspMainUrl   = $('#inspMainUrl');
+    attachDropZone(inspMainDrop, inspMainInput);
+    inspMainUrl.addEventListener('input', () => {
+      inspMainInput.value = inspMainUrl.value;
+      if (inspMainDrop._dzSet) inspMainDrop._dzSet(inspMainUrl.value);
+    });
 
     $('#inspForm').addEventListener('submit', async e => {
       e.preventDefault();
