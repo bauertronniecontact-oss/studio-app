@@ -1414,22 +1414,40 @@ function scoreImage(u) {
   if (!u) return -1;
   const s = u.toLowerCase();
   let score = 0;
-  if (/logo|icon|favicon|sprite|placeholder|thumb|swatch/.test(s)) return -1;
-  if (/\.svg(\?|$)/.test(s)) return -1;
+  if (/logo|icon|favicon|sprite|placeholder|thumb|swatch|transparent|pixel|tracking|tracker|beacon|spacer|blank|empty/.test(s)) return -1;
+  if (/\.svg(\?|$)|\.gif(\?|$)/.test(s)) return -1;
+  if (/\/akam\/|\/analytics\/|\/track\//.test(s)) return -1;
   if (/(?:model|mannequin|lookbook|outfit|lifestyle|worn|editorial|campaign|video|_e\d|-e\d)/.test(s)) score -= 5;
   if (/(?:packshot|still[-_]?life|stilllife|product|front|_p\d|-p\d|\/p\d|_1\.|-1\.|_01|_a\.|_a1|main|hero)/.test(s)) score += 5;
   return score;
 }
-function pickImages(candidates) {
+function pickImages(candidates, sourceHost = '') {
   const seen = new Set(), out = [];
+  // Garder le segment de chemin distinctif (sans query) — sinon `?w=560` et `?w=1080` deviennent doublons
+  const fingerprint = u => {
+    try {
+      const p = new URL(u).pathname;
+      // groupe sur le "stem" du fichier sans suffixes de taille (_w560, -560, @2x…)
+      return p.replace(/[_-]?\d{2,4}x?\d{0,4}(\.|$)/, '$1').replace(/@\dx/, '');
+    } catch { return u.split('?')[0]; }
+  };
   for (const c of candidates) {
     if (!c) continue;
-    const u = c.split('?')[0];
-    if (seen.has(u)) continue;
-    if (scoreImage(c) < 0) continue;
-    seen.add(u); out.push(c);
+    let u = c;
+    try { u = new URL(c).toString(); } catch { continue; }
+    const fp = fingerprint(u);
+    if (seen.has(fp)) continue;
+    if (scoreImage(u) < 0) continue;
+    // Préfère même domaine que la page source pour éviter d'attraper des CDN externes (pubs, recommandations)
+    if (sourceHost) {
+      try { const h = new URL(u).hostname.replace(/^www\./,''); if (h !== sourceHost && !h.endsWith('.' + sourceHost.split('.').slice(-2).join('.'))) {
+        // Garde quand même si c'est un CDN image typique (static.*, img.*, cdn.*)
+        if (!/^(?:static|img|images?|cdn|media|assets|i)\./.test(h)) continue;
+      } } catch {}
+    }
+    seen.add(fp); out.push(u);
   }
-  return out.sort((a,b) => scoreImage(b) - scoreImage(a)).slice(0, 8);
+  return out.sort((a,b) => scoreImage(b) - scoreImage(a)).slice(0, 12);
 }
 function parseProduct(html, sourceUrl) {
   const result = { brand: '', name: '', price: '', image: '', description: '', link: sourceUrl, cat: '', images: [] };
@@ -1499,7 +1517,30 @@ function parseProduct(html, sourceUrl) {
   }
   let urlPath = ''; try { urlPath = decodeURIComponent(new URL(sourceUrl).pathname).replace(/[-_/]/g,' '); } catch {}
   result.cat = mapCategory(categoryRaw + ' ' + result.name + ' ' + result.description + ' ' + urlPath);
-  result.images = pickImages(imgCandidates);
+
+  // Élargir : <img src>, srcset, et données JSON inline (très utile sur Zara/Zalando/H&M où la galerie est en JS)
+  const sourceHost = (() => { try { return new URL(sourceUrl).hostname.replace(/^www\./,''); } catch { return ''; } })();
+  const imgTagRe = /<img\b[^>]+(?:src|data-src|data-lazy-src|data-image-src)=["']([^"']+)["'][^>]*>/gi;
+  let im; while ((im = imgTagRe.exec(html))) {
+    const u = im[1];
+    if (/^(?:https?:)?\/\//.test(u) || u.startsWith('/')) {
+      const abs = u.startsWith('//') ? 'https:' + u : (u.startsWith('/') ? `https://${sourceHost}${u}` : u);
+      imgCandidates.push(abs);
+    }
+  }
+  // srcset
+  const srcsetRe = /\bsrcset=["']([^"']+)["']/gi;
+  let ss; while ((ss = srcsetRe.exec(html))) {
+    ss[1].split(',').forEach(part => {
+      const u = part.trim().split(/\s+/)[0];
+      if (u && /^(?:https?:)?\/\//.test(u)) imgCandidates.push(u.startsWith('//') ? 'https:' + u : u);
+    });
+  }
+  // Toutes les URLs d'image trouvées dans les blocs JSON inline (Zara, Zalando, etc.)
+  const jsonUrlRe = /["'](https?:\/\/[^"'\s]+\.(?:jpe?g|png|webp)(?:\?[^"'\s]*)?)["']/gi;
+  let ju; while ((ju = jsonUrlRe.exec(html))) imgCandidates.push(ju[1]);
+
+  result.images = pickImages(imgCandidates, sourceHost);
   if (result.images.length) result.image = result.images[0];
   if (looksLikeDomain(result.name)) result.name = '';
   if (result.name) {
