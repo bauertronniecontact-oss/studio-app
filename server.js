@@ -1421,16 +1421,33 @@ function scoreImage(u) {
   if (/(?:packshot|still[-_]?life|stilllife|product|front|_p\d|-p\d|\/p\d|_1\.|-1\.|_01|_a\.|_a1|main|hero)/.test(s)) score += 5;
   return score;
 }
-function pickImages(candidates, sourceHost = '') {
+function pickImages(candidates, sourceHost = '', primary = '') {
   const seen = new Set(), out = [];
-  // Garder le segment de chemin distinctif (sans query) — sinon `?w=560` et `?w=1080` deviennent doublons
   const fingerprint = u => {
     try {
       const p = new URL(u).pathname;
-      // groupe sur le "stem" du fichier sans suffixes de taille (_w560, -560, @2x…)
       return p.replace(/[_-]?\d{2,4}x?\d{0,4}(\.|$)/, '$1').replace(/@\dx/, '');
     } catch { return u.split('?')[0]; }
   };
+  // Tokens distinctifs de l'image principale (SKU, hash de dossier…) pour exclure les recommandations
+  const primaryTokens = (() => {
+    if (!primary) return [];
+    try {
+      const path = new URL(primary).pathname.toLowerCase();
+      const skipCommon = t => /^(image|images|public|assets|media|static|cdn|product|jpg|jpeg|png|webp|main|hero|gallery|fashion|original|large|medium|small|zoom|content|catalog|spp|article|item)$/.test(t);
+      const toks = [...path.matchAll(/[a-z0-9]{5,}/g)].map(m => m[0]).filter(t => !skipCommon(t));
+      // Tokens qui apparaissent ≥2 fois (typiquement le SKU répété dans le path) = signal fort
+      const counts = {};
+      toks.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+      const repeated = [...new Set(toks)].filter(t => counts[t] >= 2);
+      if (repeated.length) return repeated.slice(0, 3);
+      // Sinon : tokens majoritairement numériques (SKU)
+      const numeric = toks.filter(t => /^\d+$/.test(t) || (t.length >= 6 && (t.match(/\d/g) || []).length / t.length >= 0.5));
+      if (numeric.length) return [...new Set(numeric)].slice(0, 2);
+      // Dernier fallback : les 2 plus longs
+      return [...new Set(toks)].sort((a,b) => b.length - a.length).slice(0, 2);
+    } catch { return []; }
+  })();
   for (const c of candidates) {
     if (!c) continue;
     let u = c;
@@ -1438,12 +1455,15 @@ function pickImages(candidates, sourceHost = '') {
     const fp = fingerprint(u);
     if (seen.has(fp)) continue;
     if (scoreImage(u) < 0) continue;
-    // Préfère même domaine que la page source pour éviter d'attraper des CDN externes (pubs, recommandations)
     if (sourceHost) {
       try { const h = new URL(u).hostname.replace(/^www\./,''); if (h !== sourceHost && !h.endsWith('.' + sourceHost.split('.').slice(-2).join('.'))) {
-        // Garde quand même si c'est un CDN image typique (static.*, img.*, cdn.*)
         if (!/^(?:static|img|images?|cdn|media|assets|i)\./.test(h)) continue;
       } } catch {}
+    }
+    // Filtre par tokens : on garde l'image seulement si elle partage un token distinctif avec l'image principale
+    if (primaryTokens.length) {
+      const low = u.toLowerCase();
+      if (!primaryTokens.some(t => low.includes(t))) continue;
     }
     seen.add(fp); out.push(u);
   }
@@ -1540,7 +1560,7 @@ function parseProduct(html, sourceUrl) {
   const jsonUrlRe = /["'](https?:\/\/[^"'\s]+\.(?:jpe?g|png|webp)(?:\?[^"'\s]*)?)["']/gi;
   let ju; while ((ju = jsonUrlRe.exec(html))) imgCandidates.push(ju[1]);
 
-  result.images = pickImages(imgCandidates, sourceHost);
+  result.images = pickImages(imgCandidates, sourceHost, result.image);
   if (result.images.length) result.image = result.images[0];
   if (looksLikeDomain(result.name)) result.name = '';
   if (result.name) {
