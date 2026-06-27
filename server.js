@@ -362,6 +362,16 @@ app.get('/api/clients/:id/items', requireAuth, ah(async (req, res) => {
 }));
 
 // ─── Folders ───
+app.get('/api/clients/:id/moodboard', requireAuth, ah(async (req, res) => {
+  if (!await ownClient(req.session.userId, req.params.id)) return res.sendStatus(404);
+  const rows = await dbList('client_moodboard', { where: { client_id: req.params.id }, order: [{ col: 'position', asc: true }, { col: 'id', asc: false }] });
+  res.json(rows || []);
+}));
+app.delete('/api/clients/:id/moodboard/:mid', requireAuth, ah(async (req, res) => {
+  if (!await ownClient(req.session.userId, req.params.id)) return res.sendStatus(404);
+  await dbDelete('client_moodboard', { id: req.params.mid, client_id: req.params.id });
+  res.json({ ok: true });
+}));
 app.get('/api/clients/:id/folders', requireAuth, ah(async (req, res) => {
   if (!await ownClient(req.session.userId, req.params.id)) return res.sendStatus(404);
   const rows = await dbList('folders', { where: { client_id: req.params.id }, order: [{ col: 'position', asc: true }, { col: 'created_at', asc: true }] });

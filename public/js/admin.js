@@ -379,7 +379,8 @@
   /* ────────── State ────────── */
   let clients = [];
   let activeClient = null, folders = [], activeFolderId = null;
-  let activeTab = 'items'; // items | inspirations
+  let activeTab = 'items'; // items | inspirations | moodboard
+  let clientMoodboard = [];
   let items = [];
   let inspirations = [];
 
@@ -744,6 +745,7 @@
     items = await api(`/api/clients/${id}/items`);
     inspirations = await api(`/api/clients/${id}/inspirations`);
     folders = await api(`/api/clients/${id}/folders`);
+    clientMoodboard = await api(`/api/clients/${id}/moodboard`).catch(() => []);
     activeFolderId = null;
     renderMain();
   }
@@ -844,6 +846,7 @@
       <div class="admin-tabs">
         <button data-t="items" class="${activeTab==='items'?'active':''}">Sélection (${items.length})</button>
         <button data-t="inspirations" class="${activeTab==='inspirations'?'active':''}">Inspiration Style (${inspirations.length})</button>
+        <button data-t="moodboard" class="${activeTab==='moodboard'?'active':''}">Moodboard Client (${clientMoodboard.length})</button>
       </div>
 
       <div id="tabBody"></div>
@@ -915,6 +918,7 @@
     $('#qrBtn').addEventListener('click', () => openQrModal(shareUrl, activeClient));
 
     if (activeTab === 'items') renderItemsTab();
+    else if (activeTab === 'moodboard') renderMoodboardTab();
     else renderInspirationsTab();
   }
 
@@ -1548,6 +1552,43 @@
   }
 
   /* ────────── Inspirations tab ────────── */
+  function renderMoodboardTab() {
+    const html = `
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Moodboard du client (<span>${clientMoodboard.length}</span>)</h3>
+        </div>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink-soft);font-size:14px;line-height:1.5;margin-bottom:18px;max-width:640px;">
+          Ce que ${esc(activeClient.name)} a déposé comme inspirations — utilisez-les pour affiner la sélection.
+        </p>
+        ${clientMoodboard.length ? `
+          <div class="adm-items" id="mbAdmGrid">
+            ${clientMoodboard.map(m => `
+              <div class="adm-item" data-mid="${m.id}">
+                <div class="ai-thumb"><img src="${esc(m.image_url)}" alt="" onerror="this.parentElement.classList.add('placeholder');this.remove();"></div>
+                ${m.caption ? `<div class="ai-name" style="font-style:italic;color:var(--ink-soft);font-size:12px;word-break:break-all;">${esc(m.caption)}</div>` : ''}
+                <div class="ai-meta">${m.created_at ? new Date(m.created_at).toLocaleDateString('fr-FR') : ''}</div>
+                <div class="ai-actions">
+                  <button class="btn btn-ghost btn-sm btn-danger" data-mb-del="${m.id}">×</button>
+                </div>
+              </div>`).join('')}
+          </div>
+        ` : `
+          <div style="grid-column:1/-1;font-family:Cormorant Garamond,serif;font-style:italic;color:var(--muted);padding:40px;text-align:center;">
+            Le client n'a encore rien ajouté à son moodboard.
+          </div>
+        `}
+      </div>`;
+    $('#tabBody').innerHTML = html;
+    $('#tabBody').querySelectorAll('[data-mb-del]').forEach(b => b.addEventListener('click', async () => {
+      const mid = +b.dataset.mbDel;
+      if (!await modalConfirm('Retirer cette image du moodboard du client ?', { okLabel: 'Retirer', danger: true })) return;
+      await api(`/api/clients/${activeClient.id}/moodboard/${mid}`, { method: 'DELETE' });
+      clientMoodboard = clientMoodboard.filter(m => m.id !== mid);
+      renderMain();
+    }));
+  }
+
   function renderInspirationsTab() {
     $('#tabBody').innerHTML = `
       <div class="panel">
