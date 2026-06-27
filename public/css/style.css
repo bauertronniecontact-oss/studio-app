@@ -386,7 +386,7 @@ input, textarea, select { font: inherit; }
 }
 @media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 760px)  { .grid { grid-template-columns: repeat(2, 1fr); gap: 26px 14px; } }
-@media (max-width: 460px)  { .grid { grid-template-columns: 1fr; } }
+@media (max-width: 460px)  { .grid { grid-template-columns: repeat(2, 1fr); gap: 18px 10px; } }
 
 /* ─── CARTE PRODUIT ─── */
 .card {
@@ -2375,7 +2375,7 @@ img, video { max-width: 100%; height: auto; }
   .topbar-icons { gap: 4px; }
   .container { padding: 0 14px !important; }
   .hero h1 { font-size: clamp(22px, 8vw, 30px); }
-  .adm-items { grid-template-columns: 1fr !important; }
+  .adm-items { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
   .panel { padding: 14px 12px !important; }
   .modal { padding: 18px 14px !important; }
   .btn { padding: 10px 14px; font-size: 12px; }
