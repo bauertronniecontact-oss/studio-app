@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Mon profil</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body style="background:var(--bg-soft);">
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="mark" id="topMark"><span class="logo">S</span>STUDIO</div>
+    <nav>
+      <a id="backLink" href="#">← Retour à ma sélection</a>
+    </nav>
+    <div class="topbar-icons"></div>
+  </div>
+</div>
+
+<div class="container" style="padding-top:48px;padding-bottom:80px;">
+  <div style="font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">
+    Pour <span id="welcomeName">vous</span>
+  </div>
+  <h1 style="font-family:'Cormorant Garamond',serif;font-weight:400;font-size:clamp(32px,4.5vw,48px);max-width:760px;line-height:1.1;">
+    Quelques questions pour personnaliser <em>votre sélection</em>.
+  </h1>
+  <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);font-size:16px;margin-top:14px;max-width:620px;">
+    Vos réponses restent strictement privées et ne sont partagées qu'avec votre styliste.
+  </p>
+
+  <div id="content" style="margin-top:36px;"></div>
+</div>
+
+<script>
+(async function(){
+  const slug = location.pathname.split('/').filter(Boolean)[1];
+  if (!slug) { location.href = '/'; return; }
+
+  document.getElementById('backLink').href = `/c/${slug}`;
+
+  // Charger les infos publiques (studio + nom)
+  const pub = await fetch(`/api/public/${slug}`).then(r => r.ok ? r.json() : null);
+  if (!pub) { document.body.innerHTML = '<p style="padding:60px;text-align:center;font-family:Cormorant Garamond,serif;font-style:italic;">Lien invalide.</p>'; return; }
+
+  // White-label
+  const studio = pub.studio || {};
+  const studioName = (studio.studio_name || 'STUDIO').toUpperCase();
+  const logo = studio.studio_logo || studioName[0] || 'S';
+  document.getElementById('topMark').innerHTML = `<span class="logo">${esc(logo)}</span>${esc(studioName)}`;
+  if (studio.accent_color) document.documentElement.style.setProperty('--accent', studio.accent_color);
+  document.getElementById('welcomeName').textContent = pub.client.name;
+  document.title = `${studioName} — Mon profil`;
+
+  // Charger le profil
+  const prof = await fetch(`/api/public/${slug}/profile`).then(r => r.json());
+  const content = document.getElementById('content');
+
+  // Section photo (toujours disponible, même si shopper a rempli)
+  const photoSection = `
+    <div class="panel" style="background:#fff;">
+      <div class="panel-head"><h3>Votre <em>photo</em></h3></div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+        <div id="photoPreview" style="width:120px;height:140px;border:1px solid var(--hairline);background:var(--visual);overflow:hidden;position:relative;flex-shrink:0;">
+          ${pub.client.photo_url ? `<img src="${esc(pub.client.photo_url)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">` : '<div style="position:absolute;inset:0;display:grid;place-items:center;font-family:Cormorant Garamond,serif;font-style:italic;color:var(--muted);font-size:12px;">Aucune photo</div>'}
+        </div>
+        <div style="flex:1;min-width:240px;">
+          <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);font-size:14px;margin-bottom:10px;">
+            Une photo plein corps ou portrait — utilisée pour la galerie de votre styliste et l'essayage virtuel.
+          </div>
+          <label for="photoFile" class="btn btn-ghost" style="display:inline-block;cursor:pointer;">📷 Choisir une photo</label>
+          <input type="file" id="photoFile" accept="image/*" style="display:none;">
+          <span id="photoStatus" style="margin-left:10px;font-size:12px;color:var(--muted);font-style:italic;font-family:Cormorant Garamond,serif;"></span>
+          ${pub.client.photo_url ? `<button id="photoClear" class="btn btn-ghost btn-sm btn-danger" style="margin-left:8px;">Retirer</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+
+  if (prof.filled_by === 'shopper') {
+    content.innerHTML = `
+      ${photoSection}
+      <div class="empty" style="padding:60px 32px;margin-top:20px;">
+        <div class="e-title" style="font-size:24px;">Votre profil est déjà renseigné.</div>
+        <div class="e-sub" style="font-size:14px;">Votre styliste a complété vos informations directement.<br>Vous pouvez quand même ajouter / mettre à jour votre photo ci-dessus.</div>
+        <a href="/c/${slug}" class="btn" style="display:inline-block;margin-top:18px;text-decoration:none;">← Voir ma sélection</a>
+      </div>`;
+    bindPhotoHandlers();
+    return;
+  }
+
+  // Formulaire questionnaire
+  const FIELDS = {
+    'Mensurations (optionnelles)': [
+      ['height', 'Taille (cm)', 'number'],
+      ['weight', 'Poids (kg)', 'number'],
+      ['chest',  'Tour de poitrine', 'number'],
+      ['waist',  'Tour de taille', 'number'],
+      ['hips',   'Tour de hanches', 'number'],
+      ['inseam', 'Entrejambe', 'number'],
+      ['shoulder', 'Largeur épaules', 'number'],
+    ],
+    'Tailles habituelles': [
+      ['size_top',    'Taille haut', 'text', '3XL'],
+      ['size_bottom', 'Taille bas',  'text', '46'],
+      ['shoe',        'Pointure',    'text', '45'],
+    ],
+    'Style & préférences': [
+      ['styles',      'Style(s) préféré(s)', 'text', 'smart casual, street…'],
+      ['occasions',   'Occasions principales', 'text', 'bureau, sport, sorties…'],
+      ['fav_brands',  'Marques que vous aimez', 'text'],
+      ['avoid_brands','Marques à éviter', 'text'],
+      ['fav_colors',  'Couleurs favorites', 'text'],
+      ['avoid_colors','Couleurs à éviter', 'text'],
+      ['materials_avoid', 'Matières à éviter', 'text', 'laine, synthétique…'],
+    ],
+    'Budget par pièce': [
+      ['budget_min', 'Min', 'number'],
+      ['budget_max', 'Max', 'number'],
+      ['currency',   'Devise', 'text', 'CHF'],
+    ]
+  };
+
+  const existing = prof.profile || {};
+  const sections = Object.entries(FIELDS).map(([title, fields]) => `
+    <div class="panel" style="background:#fff;">
+      <div class="panel-head"><h3>${title}</h3></div>
+      <div class="form-row">
+        ${fields.map(([k, l, t, ph]) => `
+          <div class="field">
+            <label>${l}</label>
+            <input name="${k}" type="${t}" value="${esc(existing[k]||'')}" placeholder="${esc(ph||'')}">
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+
+  content.innerHTML = `
+    ${photoSection}
+    <form id="qForm" style="margin-top:24px;">
+      ${sections}
+      <div class="panel" style="background:#fff;">
+        <div class="panel-head"><h3>Notes libres</h3></div>
+        <div class="field">
+          <label>Tout ce que vous voulez nous dire</label>
+          <textarea name="notes" rows="4" placeholder="Allergies, contraintes, souhaits…">${esc(existing.notes||'')}</textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+        <a href="/c/${slug}" class="btn btn-ghost" style="text-decoration:none;">Annuler</a>
+        <button class="btn" type="submit">Envoyer mes informations</button>
+      </div>
+    </form>
+    <div id="status" style="margin-top:14px;font-size:13px;color:var(--muted);font-family:'Cormorant Garamond',serif;font-style:italic;text-align:right;display:none;"></div>`;
+
+  bindPhotoHandlers();
+
+  function bindPhotoHandlers() {
+    const file = document.getElementById('photoFile');
+    const status = document.getElementById('photoStatus');
+    const preview = document.getElementById('photoPreview');
+    const clearBtn = document.getElementById('photoClear');
+    if (!file) return;
+    file.addEventListener('change', async () => {
+      const f = file.files[0]; if (!f) return;
+      status.textContent = 'Téléchargement…';
+      try {
+        const fd = new FormData(); fd.append('file', f);
+        const r = await fetch(`/api/public/${slug}/upload`, { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('upload échoué');
+        const { url } = await r.json();
+        await fetch(`/api/public/${slug}/profile`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ photo_url: url })
+        });
+        preview.innerHTML = `<img src="${url}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`;
+        status.textContent = '✓ Photo enregistrée.';
+        status.style.color = 'var(--accent)';
+      } catch (e) {
+        status.textContent = '✗ ' + e.message;
+        status.style.color = '#b03030';
+      }
+    });
+    if (clearBtn) clearBtn.addEventListener('click', async () => {
+      await fetch(`/api/public/${slug}/profile`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ photo_url: '' })
+      });
+      preview.innerHTML = '<div style="position:absolute;inset:0;display:grid;place-items:center;font-family:Cormorant Garamond,serif;font-style:italic;color:var(--muted);font-size:12px;">Aucune photo</div>';
+      clearBtn.remove();
+      status.textContent = '✓ Photo retirée.';
+    });
+  }
+
+  document.getElementById('qForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const profile = Object.fromEntries(new FormData(e.target).entries());
+    Object.keys(profile).forEach(k => { if (!profile[k]) delete profile[k]; });
+    const status = document.getElementById('status');
+    status.style.display = 'block';
+    status.textContent = 'Envoi…';
+    try {
+      const r = await fetch(`/api/public/${slug}/profile`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ profile })
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(()=>({}));
+        throw new Error(d.error || d.message || 'Erreur');
+      }
+      status.textContent = '✓ Merci, vos informations ont bien été transmises.';
+      status.style.color = 'var(--accent)';
+      setTimeout(() => { location.href = `/c/${slug}`; }, 1500);
+    } catch (err) {
+      status.textContent = '✗ ' + err.message;
+      status.style.color = '#b03030';
+    }
+  });
+
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+})();
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Créer un compte</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <form class="login-card" id="signupForm" style="max-width:440px;">
+    <div class="logo-wrap"><div class="logo">S</div></div>
+    <h1>Créer un compte</h1>
+    <div class="sub">Espace personal shopper</div>
+
+    <div class="field">
+      <label>Votre nom</label>
+      <input type="text" name="name" placeholder="Marie Dupont" autocomplete="name">
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Nom de votre studio (optionnel)</label>
+      <input type="text" name="studio_name" placeholder="Studio Marie D." maxlength="40">
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Email</label>
+      <input type="email" name="email" required autocomplete="email">
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Mot de passe (min 6 caractères)</label>
+      <input type="password" name="password" required minlength="6" autocomplete="new-password">
+    </div>
+
+    <button class="btn" type="submit">Créer mon espace</button>
+    <div class="err" id="err" style="display:none;"></div>
+
+    <div class="alt-links">
+      <span>Déjà un compte ?</span>
+      <a href="/login">Se connecter</a>
+    </div>
+  </form>
+</div>
+<style>
+.alt-links {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+  text-align: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 14px;
+  color: var(--muted);
+}
+.alt-links a {
+  margin-left: 6px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-style: italic;
+}
+.alt-links a:hover { color: var(--accent); }
+</style>
+<script>
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(e.target).entries());
+  const err = document.getElementById('err');
+  err.style.display = 'none';
+  const r = await fetch('/api/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fd)
+  });
+  if (r.ok) location.href = '/admin';
+  else {
+    const d = await r.json().catch(() => ({}));
+    err.textContent = d.error || 'Impossible de créer le compte.';
+    err.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>

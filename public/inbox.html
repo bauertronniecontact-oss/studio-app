@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Boîte de réception</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-side">
+    <div class="mark" id="sideMark"><span class="logo">S</span>STUDIO</div>
+    <div class="side-label">Navigation</div>
+    <a class="client-row" href="/admin">Sélections</a>
+    <a class="client-row" href="/admin/dashboard">Dashboard</a>
+    <a class="client-row" href="/admin/templates">Templates</a>
+    <a class="client-row active" href="/admin/inbox">
+      Boîte de réception
+      <span class="c-count" id="sideUnread"></span>
+    </a>
+  </aside>
+  <main class="admin-main" id="main">
+    <div style="padding:60px;text-align:center;color:var(--muted);font-family:'Cormorant Garamond',serif;font-style:italic;">Chargement…</div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(async function(){
+  const api = async (u, o={}) => {
+    const r = await fetch(u, { headers:{'Content-Type':'application/json'}, ...o, body: o.body?JSON.stringify(o.body):undefined });
+    if (r.status === 401) { location.href = '/login'; throw 0; }
+    if (!r.ok) throw new Error('err');
+    return r.json();
+  };
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const toast = m => { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); };
+  const ago = s => {
+    if (!s) return '';
+    const min = Math.floor((Date.now() - new Date(s).getTime()) / 60000);
+    if (min < 1)   return "à l'instant";
+    if (min < 60)  return `il y a ${min} min`;
+    const h = Math.floor(min / 60);
+    if (h < 24)    return `il y a ${h}h`;
+    const d = Math.floor(h / 24);
+    if (d < 7)     return `il y a ${d}j`;
+    if (d < 30)    return `il y a ${Math.floor(d/7)} sem.`;
+    return new Date(s).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'});
+  };
+
+  const me = await api('/api/me');
+  const studioName = (me.studio_name || 'STUDIO').toUpperCase();
+  const logo = me.studio_logo || studioName[0] || 'S';
+  document.getElementById('sideMark').innerHTML = `<span class="logo">${esc(logo)}</span>${esc(studioName)}`;
+  if (me.accent_color) document.documentElement.style.setProperty('--accent', me.accent_color);
+
+  let activeFilter = 'all';
+  let items = [];
+
+  async function load() {
+    const data = await api('/api/inbox');
+    items = data.items;
+    document.getElementById('sideUnread').textContent = data.unread > 0 ? data.unread : '';
+    render();
+  }
+
+  function render() {
+    const kindByFilter = { likes: 'client_like', comments: 'client_comment', requests: 'new_request' };
+    const filtered = activeFilter === 'all'
+      ? items
+      : items.filter(i => i.kind === kindByFilter[activeFilter]);
+    const unreadCount = items.filter(i => !i.read_at).length;
+
+    document.getElementById('main').innerHTML = `
+      <div class="admin-head">
+        <div>
+          <h2>Boîte de <em>réception</em></h2>
+          <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);font-size:14px;margin-top:6px;">
+            ${items.length} retour${items.length>1?'s':''} client · ${unreadCount} non lu${unreadCount>1?'s':''}
+          </div>
+        </div>
+        ${unreadCount > 0 ? `<button class="btn btn-ghost btn-sm" id="readAllBtn">Tout marquer comme lu</button>` : ''}
+      </div>
+
+      <div class="inbox-filters">
+        <button class="ix-filter ${activeFilter==='all'?'active':''}" data-f="all">Tous (${items.length})</button>
+        <button class="ix-filter ${activeFilter==='requests'?'active':''}" data-f="requests">Nouveaux clients (${items.filter(i=>i.kind==='new_request').length})</button>
+        <button class="ix-filter ${activeFilter==='likes'?'active':''}" data-f="likes">♥ Likes (${items.filter(i=>i.kind==='client_like').length})</button>
+        <button class="ix-filter ${activeFilter==='comments'?'active':''}" data-f="comments">Commentaires (${items.filter(i=>i.kind==='client_comment').length})</button>
+      </div>
+
+      <div class="inbox-list">
+        ${filtered.length ? filtered.map(n => renderItem(n)).join('') : `
+          <div class="empty" style="padding:60px 32px;">
+            <div class="e-title">Aucun retour</div>
+            <div class="e-sub">Quand vos clients aimeront ou commenteront une pièce, vous le verrez ici.</div>
+          </div>`}
+      </div>
+    `;
+
+    document.querySelectorAll('.ix-filter').forEach(b => {
+      b.addEventListener('click', () => { activeFilter = b.dataset.f; render(); });
+    });
+    document.getElementById('readAllBtn')?.addEventListener('click', async () => {
+      await api('/api/inbox/read-all', { method: 'POST' });
+      toast('Tout marqué comme lu.');
+      load();
+    });
+    document.querySelectorAll('.ix-item').forEach(el => {
+      const id = +el.dataset.id;
+      el.querySelector('.ix-read')?.addEventListener('click', async () => {
+        await api(`/api/inbox/${id}/read`, { method: 'POST' });
+        load();
+      });
+    });
+  }
+
+  function renderItem(n) {
+    const kindLabels = {
+      client_like:    { label: 'a aimé',          cls: 'kind-like' },
+      client_comment: { label: 'a commenté',      cls: 'kind-comment' },
+      new_request:    { label: 'nouveau client',  cls: 'kind-request' }
+    };
+    const k = kindLabels[n.kind] || { label: n.kind, cls: '' };
+    const initial = (n.client_name || '?').trim().charAt(0).toUpperCase();
+    const ctaLabel = n.kind === 'new_request' ? 'Ouvrir le profil' : 'Voir le contexte';
+    return `
+      <div class="ix-item ${n.read_at ? 'read' : 'unread'}" data-id="${n.id}">
+        <div class="ix-avatar">
+          ${n.client_photo
+            ? `<img src="${esc(n.client_photo)}" alt="" onerror="this.parentElement.classList.add('no-img');this.remove();">`
+            : `<span class="ix-initial">${esc(initial)}</span>`}
+        </div>
+        <div class="ix-body">
+          <div class="ix-head">
+            <span class="ix-client">${esc(n.client_name)}</span>
+            <span class="ix-kind ${k.cls}">${k.label}</span>
+            <span class="ix-time">${ago(n.created_at)}</span>
+          </div>
+          <div class="ix-text">${esc(n.body || '')}</div>
+          <div class="ix-actions">
+            <a href="/c/${esc(n.client_slug)}" target="_blank" rel="noopener">${ctaLabel}</a>
+            ${!n.read_at ? `<span class="ix-sep">·</span><button class="ix-read">Marquer comme lu</button>` : ''}
+          </div>
+        </div>
+        ${!n.read_at ? `<span class="ix-dot" title="Non lu"></span>` : ''}
+      </div>`;
+  }
+
+  load();
+})();
+</script>
+<style>
+.inbox-filters {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 0;
+}
+.ix-filter {
+  background: none; border: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 500;
+  color: var(--muted);
+  padding: 14px 0;
+  margin-right: 28px;
+  cursor: pointer;
+  position: relative;
+  letter-spacing: 0.02em;
+  transition: color 0.15s;
+}
+.ix-filter:hover { color: var(--ink); }
+.ix-filter.active { color: var(--ink); }
+.ix-filter.active::after {
+  content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+  height: 1px; background: var(--ink);
+}
+
+.inbox-list { display: flex; flex-direction: column; }
+.ix-item {
+  display: flex; align-items: flex-start;
+  gap: 16px;
+  padding: 18px 4px;
+  border-bottom: 1px solid var(--hairline);
+  position: relative;
+  transition: background 0.12s;
+}
+.ix-item:hover { background: var(--bg-soft); }
+.ix-item.unread { background: rgba(184,145,90,0.04); }
+.ix-item.unread:hover { background: rgba(184,145,90,0.06); }
+.ix-avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--visual);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.ix-avatar img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+}
+.ix-initial {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic; font-size: 18px;
+  color: rgba(17,17,17,0.4);
+}
+.ix-body { flex: 1; min-width: 0; }
+.ix-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.ix-client {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 17px; color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.ix-kind {
+  font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.kind-like    { background: rgba(231,76,60,0.12); color: #c0392b; }
+.kind-comment { background: rgba(46,93,124,0.12); color: #2c5d7c; }
+.kind-request { background: rgba(184,145,90,0.16); color: var(--accent-deep, #8a6a3a); }
+.ix-time {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic; font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+.ix-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.ix-actions {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+}
+.ix-actions a, .ix-actions button {
+  background: none; border: none;
+  color: var(--ink-soft);
+  padding: 0; cursor: pointer;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.ix-actions a:hover, .ix-actions button:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ix-actions .ix-sep { color: var(--muted-2); }
+.ix-dot {
+  position: absolute; top: 22px; right: 6px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+#sideUnread:not(:empty) {
+  background: var(--accent);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  font-style: normal;
+  font-family: 'Inter', sans-serif;
+}
+</style>
+</body>
+</html>

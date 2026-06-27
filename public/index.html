@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Sélection</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="mark"><span class="logo">S</span>STUDIO</div>
+    <nav>
+      <button class="tab active" data-tab="selection">Sélection</button>
+      <button class="tab" data-tab="inspiration">Inspiration</button>
+      <button class="tab" data-tab="moodboard">Moodboard</button>
+    </nav>
+    <div class="topbar-icons">
+      <button title="Compte" aria-label="Compte">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+      </button>
+      <button title="Favoris" aria-label="Favoris">
+        <svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 6.5-7 11-7 11z"/></svg>
+      </button>
+      <button title="Recherche" aria-label="Recherche">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SÉLECTION ─── -->
+<section class="section" id="tab-selection">
+  <div class="container">
+    <div class="hero">
+      <h1>
+        <span class="hero-line">
+          Ma sélection de
+          <span class="pick" id="pickCat" data-key="cat">pièces</span>
+          pour vous
+        </span>
+        <span class="hero-line">
+          de toute
+          <span class="pick" id="pickBrand" data-key="brand">marque</span>
+        </span>
+      </h1>
+      <div class="hero-collection">
+        <span class="hc-label">Collection</span>
+        <span class="pick" id="pickFolder" data-key="folderId">Mes collections</span>
+      </div>
+    </div>
+
+    <div id="counter" style="margin-bottom:20px;font-size:12px;letter-spacing:0.06em;color:var(--muted);"></div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="adv-filters-row" style="margin:40px 0 60px;justify-content:flex-end;">
+      <button class="adv-filters-btn" id="advFiltersBtn">
+        Filtres avancés
+        <svg viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ─── MOODBOARD ─── -->
+<section class="section" id="tab-moodboard" style="display:none;">
+  <div class="container">
+    <div class="hero" style="padding:40px 0 20px;">
+      <h1>
+        <span class="hero-line">Mon <span style="font-style:italic;color:var(--accent);">moodboard</span></span>
+      </h1>
+      <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:17px;color:var(--ink-soft);line-height:1.5;margin-top:18px;max-width:640px;">
+        Ici, déposez les vêtements, photos ou ambiances qui vous inspirent — vos coups de cœur, vos références, vos envies. Votre styliste s'en inspirera pour affiner vos prochaines sélections.
+      </p>
+    </div>
+
+    <div id="moodboardDrop" style="border:2px dashed var(--hairline-strong);background:var(--bg-soft);padding:40px 24px;text-align:center;cursor:pointer;border-radius:3px;margin-bottom:14px;transition:background .2s,border-color .2s;">
+      <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:16px;color:var(--ink-soft);margin-bottom:6px;">＋ Déposez une image ici ou cliquez pour parcourir</div>
+      <div style="font-size:11px;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;">JPG / PNG · max 12 Mo</div>
+      <input type="file" id="moodboardInput" accept="image/*" style="display:none;">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="flex:1;height:1px;background:var(--hairline);"></div>
+      <span style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);font-size:13px;">ou collez un lien</span>
+      <div style="flex:1;height:1px;background:var(--hairline);"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:28px;">
+      <input id="moodboardUrl" type="url" placeholder="https://… (image ou page produit)" style="flex:1;background:#fff;border:1px solid var(--hairline-strong);padding:10px 12px;font-size:13px;border-radius:2px;">
+      <button class="btn" id="moodboardUrlBtn" type="button" style="display:inline-flex;align-items:center;gap:8px;"><span id="moodboardUrlLabel">Ajouter</span><span id="moodboardUrlSpinner" style="display:none;width:13px;height:13px;border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:scrapeSpin .7s linear infinite;"></span></button>
+    </div>
+    <div id="moodboardUrlStatus" style="font-size:12px;color:var(--muted);margin-bottom:18px;display:none;"></div>
+
+    <div id="moodboardGrid" class="grid"></div>
+  </div>
+</section>
+
+<!-- ─── INSPIRATION ─── -->
+<section class="section" id="tab-inspiration" style="display:none;">
+  <div class="container">
+    <div class="section-head" style="margin-top:36px;">
+      <div><h2>Inspiration <em>Style</em></h2></div>
+      <div class="right" id="insp-counter">— looks</div>
+    </div>
+    <div id="insp-list"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="f-mark">STUDIO</div>
+    <div class="f-meta">Personal Shopping</div>
+  </div>
+</footer>
+
+<script src="/js/public.js"></script>
+</body>
+</html>

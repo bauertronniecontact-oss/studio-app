@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Dashboard</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-side">
+    <div class="mark" id="sideMark"><span class="logo">S</span>STUDIO</div>
+    <div class="side-label">Navigation</div>
+    <a class="client-row" href="/admin">Sélections</a>
+    <a class="client-row active" href="/admin/dashboard">Dashboard</a>
+    <a class="client-row" href="/admin/templates">Templates</a>
+    <a class="client-row" href="/admin/inbox">Boîte de réception</a>
+  </aside>
+  <main class="admin-main" id="main">
+    <div style="padding:40px;text-align:center;color:var(--muted);">Chargement…</div>
+  </main>
+</div>
+<script>
+(async function(){
+  const api = async (u, o={}) => { const r = await fetch(u, { headers:{'Content-Type':'application/json'}, ...o, body: o.body?JSON.stringify(o.body):undefined }); if(r.status===401){location.href='/login';throw 0;} if(!r.ok) throw new Error('err'); return r.json(); };
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const me = await api('/api/me');
+  const studioName = (me.studio_name || 'STUDIO').toUpperCase();
+  const logo = me.studio_logo || studioName[0] || 'S';
+  document.getElementById('sideMark').innerHTML = `<span class="logo">${esc(logo)}</span>${esc(studioName)}`;
+  if (me.accent_color) document.documentElement.style.setProperty('--accent', me.accent_color);
+
+  const d = await api('/api/dashboard');
+  const stat = (v, l) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  const fmtDate = s => s ? new Date(s).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+  const ago = s => {
+    if (!s) return 'jamais';
+    const days = Math.floor((Date.now() - new Date(s).getTime()) / (1000*60*60*24));
+    if (days < 1) return "aujourd'hui";
+    if (days < 7) return `il y a ${days}j`;
+    if (days < 30) return `il y a ${Math.floor(days/7)} sem.`;
+    return `il y a ${Math.floor(days/30)} mois`;
+  };
+
+  const toast = m => {
+    let t = document.getElementById('dashToast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'dashToast';
+      t.className = 'toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = m;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  };
+
+  document.getElementById('main').innerHTML = `
+    <div class="admin-head">
+      <h2>Tableau de <em>bord</em></h2>
+      <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);">${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+    </div>
+
+    <div class="stats">
+      ${stat(d.clients_count, 'Clients')}
+      ${stat(d.items_count, 'Pièces actives')}
+      ${stat((d.events.view_page||0), 'Visites totales')}
+      ${stat(d.revenue_estimated.toLocaleString('fr-CH'), 'Valeur estimée')}
+      ${stat((d.events.click_item||0)+(d.events.click_ref||0), 'Clics produits')}
+      ${stat((d.events.view_inspiration||0), 'Vues inspirations')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px;">
+      <div class="panel">
+        <div class="panel-head"><h3>Top marques</h3></div>
+        <div class="bar-list">
+          ${d.top_brands.length ? d.top_brands.map(b => `
+            <div class="bar-row">
+              <span>${esc(b.brand)}</span>
+              <div class="bar"><div class="bar-fill" style="width:${(b.n/d.top_brands[0].n)*100}%"></div></div>
+              <strong>${b.n}</strong>
+            </div>`).join('') : '<div style="font-style:italic;color:var(--muted);">Aucune donnée.</div>'}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Top catégories</h3></div>
+        <div class="bar-list">
+          ${d.top_cats.length ? d.top_cats.map(b => `
+            <div class="bar-row">
+              <span>${esc(b.cat)}</span>
+              <div class="bar"><div class="bar-fill" style="width:${(b.n/d.top_cats[0].n)*100}%"></div></div>
+              <strong>${b.n}</strong>
+            </div>`).join('') : '<div style="font-style:italic;color:var(--muted);">Aucune donnée.</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:24px;">
+      <div class="panel">
+        <div class="panel-head"><h3>Clients dormants</h3></div>
+        ${d.dormant_clients.length ? d.dormant_clients.map(c => `
+          <div class="list-row" data-id="${c.id}" data-slug="${esc(c.slug)}" data-name="${esc(c.name)}">
+            <div class="lr-info">
+              <div class="lr-name">${esc(c.name)}</div>
+              <div class="lr-sub">Dernière visite : ${ago(c.last_viewed_at)}</div>
+            </div>
+            <div class="lr-actions">
+              <a href="/c/${esc(c.slug)}" target="_blank" rel="noopener">Voir</a>
+              <span class="lr-sep">·</span>
+              <button data-act="copy">Copier</button>
+              <span class="lr-sep">·</span>
+              <button class="lr-danger" data-act="delete">Supprimer</button>
+            </div>
+          </div>`).join('') : '<div style="font-style:italic;color:var(--muted);">Aucun.</div>'}
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Anniversaires (30j)</h3></div>
+        ${d.upcoming_birthdays.length ? d.upcoming_birthdays.map(c => `
+          <div class="list-row">
+            <div>
+              <div style="font-family:'Cormorant Garamond',serif;font-size:16px;">${esc(c.name)}</div>
+              <div style="font-size:11px;color:var(--muted);">${esc(c.birthday)} · dans ${c.in_days}j</div>
+            </div>
+          </div>`).join('') : '<div style="font-style:italic;color:var(--muted);">Aucun.</div>'}
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>À faire</h3></div>
+        ${d.actions.length ? d.actions.map(c => `
+          <div class="list-row">
+            <div>
+              <div style="font-family:'Cormorant Garamond',serif;font-size:16px;">${esc(c.name)}</div>
+              <div style="font-size:12px;color:var(--ink-soft);">${esc(c.next_action)}</div>
+              <div style="font-size:11px;color:var(--muted);">${c.next_action_at ? fmtDate(c.next_action_at) : ''}</div>
+            </div>
+          </div>`).join('') : '<div style="font-style:italic;color:var(--muted);">Aucune action planifiée.</div>'}
+      </div>
+    </div>
+  `;
+
+  /* ──── Handlers des quick-actions du dashboard ──── */
+  document.querySelectorAll('.list-row[data-id] .lr-actions button').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const row = btn.closest('.list-row');
+      const id = row.dataset.id;
+      const slug = row.dataset.slug;
+      const name = row.dataset.name;
+      const act = btn.dataset.act;
+
+      if (act === 'copy') {
+        e.preventDefault();
+        const url = `${location.origin}/c/${slug}`;
+        navigator.clipboard.writeText(url).then(() => toast('✓ Lien copié.'));
+      } else if (act === 'delete') {
+        e.preventDefault();
+        if (!confirm(`Supprimer « ${name} » et toutes ses données ? Action irréversible.`)) return;
+        try {
+          await api(`/api/clients/${id}`, { method: 'DELETE' });
+          row.style.transition = 'opacity 0.2s';
+          row.style.opacity = '0';
+          setTimeout(() => row.remove(), 200);
+          toast('Client supprimé.');
+        } catch (err) {
+          toast('Erreur : ' + (err.message || 'inconnue'));
+        }
+      }
+      // 'open' et 'edit' sont des <a> natifs avec href, on les laisse faire
+    });
+  });
+})();
+</script>
+<style>
+.stats { display:grid; grid-template-columns: repeat(6,1fr); gap:14px; }
+@media (max-width: 1000px) { .stats { grid-template-columns: repeat(3,1fr); } }
+@media (max-width: 600px) { .stats { grid-template-columns: repeat(2,1fr); } }
+.stat { background:var(--bg-soft); padding:20px; border:1px solid var(--hairline); border-radius:2px; }
+.stat .v { font-family:'Cormorant Garamond',serif; font-size:32px; font-weight:400; line-height:1; }
+.stat .l { font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); margin-top:8px; }
+.bar-list { display:flex; flex-direction:column; gap:10px; }
+.bar-row { display:grid; grid-template-columns: 120px 1fr 32px; gap:12px; align-items:center; font-size:13px; }
+.bar-row span { font-family:'Inter',sans-serif; font-weight:500; letter-spacing:0.06em; }
+.bar { height:6px; background:var(--bg-soft); border:1px solid var(--hairline); position:relative; }
+.bar-fill { height:100%; background:var(--accent); }
+.bar-row strong { text-align:right; font-family:'Cormorant Garamond',serif; font-size:16px; font-weight:400; }
+.list-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--hairline); }
+.list-row:last-child { border-bottom: none; }
+
+.lr-info { flex: 1; min-width: 0; }
+.lr-name { font-family:'Cormorant Garamond',serif; font-size: 16px; }
+.lr-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.lr-actions {
+  display: flex; align-items: center;
+  gap: 8px; flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+}
+.lr-actions a,
+.lr-actions button {
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.lr-actions a:hover,
+.lr-actions button:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lr-actions .lr-danger { color: #b03030; }
+.lr-actions .lr-danger:hover { color: #8a2020; }
+.lr-actions .lr-sep {
+  color: var(--muted-2);
+  font-size: 11px;
+}
+</style>
+</body>
+</html>

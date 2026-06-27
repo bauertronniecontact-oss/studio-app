@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Espace client</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card" style="max-width:420px;">
+    <div class="logo-wrap"><div class="logo">S</div></div>
+    <h1>Mon espace</h1>
+    <div class="sub">Accédez à votre sélection</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="password">Email + mot de passe</button>
+      <button class="auth-tab" data-tab="magic">Lien magique</button>
+    </div>
+
+    <!-- Email + password -->
+    <form id="pwdForm" class="auth-pane active">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" name="email" required autocomplete="email">
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Mot de passe</label>
+        <input type="password" name="password" required autocomplete="current-password">
+      </div>
+      <button class="btn" type="submit">Se connecter</button>
+      <div class="err" id="pwdErr" style="display:none;"></div>
+      <div class="alt">
+        <button type="button" class="link-btn" data-switch="magic">Mot de passe oublié → recevoir un lien magique</button>
+      </div>
+    </form>
+
+    <!-- Magic link -->
+    <form id="magicForm" class="auth-pane">
+      <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);text-align:center;margin-bottom:16px;font-size:14px;line-height:1.5;">
+        Entrez votre email — nous vous enverrons un lien à usage unique pour vous connecter sans mot de passe.
+      </p>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" name="email" required autocomplete="email">
+      </div>
+      <button class="btn" type="submit">Recevoir mon lien</button>
+      <div class="err" id="magicMsg" style="display:none;color:var(--accent);"></div>
+    </form>
+  </div>
+</div>
+<style>
+.auth-tabs {
+  display: flex; gap: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 2px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.auth-tab {
+  flex: 1; background: #fff;
+  border: none; padding: 10px 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px; font-weight: 500;
+  color: var(--ink-soft);
+  border-right: 1px solid var(--hairline-strong);
+  cursor: pointer;
+}
+.auth-tab:last-child { border-right: none; }
+.auth-tab:hover { color: var(--ink); }
+.auth-tab.active { background: var(--ink); color: #fff; }
+.auth-pane { display: none; }
+.auth-pane.active { display: block; }
+.alt {
+  margin-top: 14px; text-align: center;
+}
+.link-btn {
+  background: none; border: none;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic; font-size: 13px;
+  color: var(--ink-soft); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.link-btn:hover { color: var(--ink); }
+</style>
+<script>
+const tabs = document.querySelectorAll('.auth-tab');
+const panes = document.querySelectorAll('.auth-pane');
+function switchTo(name) {
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  panes.forEach(p => p.classList.toggle('active', p.id === (name === 'password' ? 'pwdForm' : 'magicForm')));
+}
+tabs.forEach(t => t.addEventListener('click', () => switchTo(t.dataset.tab)));
+document.querySelectorAll('[data-switch]').forEach(b =>
+  b.addEventListener('click', () => switchTo(b.dataset.switch)));
+
+document.getElementById('pwdForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(e.target).entries());
+  const err = document.getElementById('pwdErr');
+  err.style.display = 'none';
+  const r = await fetch('/c/auth/login', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(fd)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) location.href = `/c/${d.slug}`;
+  else { err.textContent = d.error || 'Erreur'; err.style.display = 'block'; }
+});
+
+document.getElementById('magicForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = e.target.email.value.trim();
+  const msg = document.getElementById('magicMsg');
+  msg.style.display = 'none';
+  await fetch('/c/auth/magic-link', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ email })
+  });
+  msg.textContent = '✓ Si un compte existe pour cet email, un lien vient d\'être envoyé. Vérifiez votre boîte (et vos spams).';
+  msg.style.display = 'block';
+  e.target.reset();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "studio",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/Users/Ronnie/Desktop/Claude.code/WEB.APP.STYLING/studio-app/server.js"],
+      "port": 3001,
+      "cwd": "/Users/Ronnie/Desktop/Claude.code/WEB.APP.STYLING/studio-app",
+      "env": { "PORT": "3001" }
+    }
+  ]
+}
