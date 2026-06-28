@@ -92,17 +92,35 @@ async function dbMaxPos(table, where) {
   return data?.[0]?.position || 0;
 }
 
-/* ─────────── Upload (multer local) ─────────── */
-const UPLOAD_DIR = path.join(__dirname, 'data', 'uploads');
+/* ─────────── Upload (Supabase Storage) ─────────── */
+const UPLOAD_BUCKET = process.env.SUPABASE_BUCKET || 'studio-uploads';
+const UPLOAD_DIR = path.join(__dirname, 'data', 'uploads'); // legacy fallback (lecture seule)
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase().slice(0, 8) || '.jpg';
-      cb(null, `${Date.now()}-${nanoid(8)}${ext}`);
+
+// Auto-création du bucket public au démarrage
+(async () => {
+  try {
+    const { data: buckets } = await sb.storage.listBuckets();
+    if (!buckets || !buckets.find(b => b.name === UPLOAD_BUCKET)) {
+      const { error } = await sb.storage.createBucket(UPLOAD_BUCKET, { public: true, fileSizeLimit: '12MB' });
+      if (error && !/already exists/i.test(error.message)) console.error('Bucket create error:', error.message);
+      else console.log(`▸ Supabase bucket "${UPLOAD_BUCKET}" prêt.`);
     }
-  }),
+  } catch (e) { console.error('Bucket init error:', e.message); }
+})();
+
+async function uploadToSupabase(file) {
+  const ext = (path.extname(file.originalname || '') || '.jpg').toLowerCase().slice(0, 8);
+  const key = `${Date.now()}-${nanoid(8)}${ext}`;
+  const { error } = await sb.storage.from(UPLOAD_BUCKET)
+    .upload(key, file.buffer, { contentType: file.mimetype, upsert: false });
+  if (error) throw error;
+  const { data } = sb.storage.from(UPLOAD_BUCKET).getPublicUrl(key);
+  return data.publicUrl;
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!/^image\//.test(file.mimetype)) return cb(new Error('image only'));
@@ -661,19 +679,22 @@ app.delete('/api/refs/:id', requireAuth, ah(async (req, res) => {
 /* ═══════════════════════════════════════════ */
 /*               UPLOADS                       */
 /* ═══════════════════════════════════════════ */
-app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
+app.post('/api/upload', requireAuth, upload.single('file'), ah(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'aucun fichier' });
-  res.json({ url: `/uploads/${req.file.filename}` });
-});
-app.post('/api/upload/multi', requireAuth, upload.array('files', 10), (req, res) => {
+  const url = await uploadToSupabase(req.file);
+  res.json({ url });
+}));
+app.post('/api/upload/multi', requireAuth, upload.array('files', 10), ah(async (req, res) => {
   if (!req.files?.length) return res.status(400).json({ error: 'aucun fichier' });
-  res.json({ urls: req.files.map(f => `/uploads/${f.filename}`) });
-});
+  const urls = await Promise.all(req.files.map(uploadToSupabase));
+  res.json({ urls });
+}));
 app.post('/api/public/:slug/upload', upload.single('file'), ah(async (req, res) => {
   const c = await dbFirst('clients', { slug: req.params.slug }, { select: 'id' });
   if (!c) return res.sendStatus(404);
   if (!req.file) return res.status(400).json({ error: 'aucun fichier' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  const url = await uploadToSupabase(req.file);
+  res.json({ url });
 }));
 
 /* ─── Moodboard client ─── */
