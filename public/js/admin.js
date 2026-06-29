@@ -1663,20 +1663,11 @@
 
       <div style="margin-top:16px;">
         <div style="font-family:Cormorant Garamond,serif;font-style:italic;color:rgba(243,234,208,0.6);font-size:13px;margin-bottom:6px;">
-          Cliquez sur l'image pour placer le point d'ancrage de la pièce sélectionnée.
+          Cliquez sur l'image pour ajouter un point · Glissez un point pour le repositionner.
         </div>
         <div class="anchor-edit ${ins.main_image ? '' : 'placeholder'}">
           ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="">` : ''}
         </div>
-      </div>
-
-      <div style="margin-top:18px;">
-        <form class="add-piece-form">
-          <div class="form-row">
-            <div class="field" style="grid-column:span 3"><label>Nouvelle pièce — label (ex: Veste, Pantalon…)</label><input name="label" required></div>
-            <div class="field"><label>&nbsp;</label><button class="btn" type="submit">Ajouter</button></div>
-          </div>
-        </form>
       </div>
 
       <div class="pieces-list" style="margin-top:14px;display:flex;flex-direction:column;gap:14px;"></div>
@@ -1724,22 +1715,88 @@
         dot.style.top  = p.anchor_y + '%';
         dot.textContent = i + 1;
         dot.dataset.id = p.id;
-        if (p.id === selectedPieceId) dot.style.outline = '2px solid #fff';
-        dot.addEventListener('click', e => { e.stopPropagation(); selectedPieceId = p.id; refreshDots(); refreshPieces(); });
+        dot.title = p.label || '';
+        dot.style.cursor = 'grab';
+        if (p.id === selectedPieceId) dot.classList.add('selected');
+        // Hover sync
+        dot.addEventListener('mouseenter', () => {
+          piecesList.querySelector(`[data-piece-id="${p.id}"]`)?.classList.add('hovered-from-dot');
+        });
+        dot.addEventListener('mouseleave', () => {
+          piecesList.querySelector(`[data-piece-id="${p.id}"]`)?.classList.remove('hovered-from-dot');
+        });
+        // Drag pour repositionner
+        let dragging = false, startX = 0, startY = 0;
+        dot.addEventListener('mousedown', e => {
+          e.stopPropagation();
+          dragging = true; startX = e.clientX; startY = e.clientY;
+          dot.style.cursor = 'grabbing';
+          selectedPieceId = p.id; refreshDots(); refreshPieces();
+          const onMove = ev => {
+            if (!dragging) return;
+            const r = ae.getBoundingClientRect();
+            const x = Math.max(0, Math.min(100, ((ev.clientX - r.left) / r.width) * 100));
+            const y = Math.max(0, Math.min(100, ((ev.clientY - r.top)  / r.height) * 100));
+            dot.style.left = x + '%'; dot.style.top = y + '%';
+            p.anchor_x = x; p.anchor_y = y;
+          };
+          const onUp = async ev => {
+            if (!dragging) return;
+            dragging = false;
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            dot.style.cursor = 'grab';
+            // Si déplacement minime → juste sélection
+            const moved = Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 4;
+            if (moved) {
+              await api(`/api/pieces/${p.id}`, { method: 'PUT', body: { anchor_x: p.anchor_x, anchor_y: p.anchor_y } });
+            }
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
         ae.appendChild(dot);
       });
     }
 
+    // Clic sur image (pas sur un dot) = créer une nouvelle pièce à cette position
     ae.addEventListener('click', async (e) => {
-      if (!selectedPieceId) { toast('Sélectionnez une pièce d\'abord.'); return; }
+      if (e.target.classList.contains('ae-dot') || e.target.closest('.ae-dot')) return;
+      if (!ins.main_image) return;
       const r = ae.getBoundingClientRect();
       const x = ((e.clientX - r.left) / r.width)  * 100;
       const y = ((e.clientY - r.top)  / r.height) * 100;
-      await api(`/api/pieces/${selectedPieceId}`, { method: 'PUT', body: { anchor_x: x, anchor_y: y } });
-      const p = ins.pieces.find(x => x.id === selectedPieceId);
-      p.anchor_x = x; p.anchor_y = y;
-      refreshDots();
-      toast('Ancrage mis à jour.');
+      // Popover inline pour saisir le label
+      const pop = document.createElement('div');
+      pop.className = 'ae-quick-add';
+      pop.style.cssText = `position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-130%);background:#fff;border:1px solid var(--ink);padding:6px;display:flex;gap:4px;z-index:50;box-shadow:0 6px 22px rgba(0,0,0,0.18);border-radius:2px;`;
+      pop.innerHTML = `<input type="text" placeholder="Pièce (ex. Veste)" style="border:none;outline:none;font-size:13px;padding:4px 6px;width:140px;font-family:'Inter',sans-serif;"><button type="button" style="background:var(--ink);color:#fff;border:none;padding:4px 10px;font-size:11px;cursor:pointer;letter-spacing:0.04em;">Ajouter</button>`;
+      ae.appendChild(pop);
+      const input = pop.querySelector('input');
+      const btn = pop.querySelector('button');
+      input.focus();
+      const submit = async () => {
+        const label = input.value.trim();
+        if (!label) { pop.remove(); return; }
+        const p = await api(`/api/inspirations/${ins.id}/pieces`, {
+          method: 'POST', body: { label, anchor_x: x, anchor_y: y }
+        });
+        p.refs = [];
+        ins.pieces.push(p);
+        selectedPieceId = p.id;
+        pop.remove();
+        refreshDots(); refreshPieces();
+      };
+      btn.addEventListener('click', submit);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submit(); }
+        if (e.key === 'Escape') pop.remove();
+      });
+      // Click outside pour fermer
+      setTimeout(() => {
+        const closeOnOutside = ev => { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('click', closeOnOutside); } };
+        document.addEventListener('click', closeOnOutside);
+      }, 0);
     });
 
     root.querySelector('[data-act="del"]').addEventListener('click', async () => {
@@ -1773,19 +1830,6 @@
       renderMain();
       toast('Inspiration dupliquée.');
     });
-    root.querySelector('.add-piece-form').addEventListener('submit', async e => {
-      e.preventDefault();
-      const label = e.target.label.value;
-      const p = await api(`/api/inspirations/${ins.id}/pieces`, {
-        method: 'POST', body: { label, anchor_x: 50, anchor_y: 50 }
-      });
-      p.refs = [];
-      ins.pieces.push(p);
-      selectedPieceId = p.id;
-      e.target.reset();
-      refreshDots(); refreshPieces();
-      toast('Pièce ajoutée. Cliquez sur l\'image pour la positionner.');
-    });
 
     function refreshPieces() {
       piecesList.innerHTML = '';
@@ -1794,8 +1838,15 @@
 
     function renderPieceEditor(ins, p, i) {
       const el = document.createElement('div');
-      el.style.cssText = 'background:rgba(243,234,208,0.04);border:1px solid var(--hairline-light);padding:14px;';
+      el.dataset.pieceId = p.id;
+      el.style.cssText = 'background:rgba(243,234,208,0.04);border:1px solid var(--hairline-light);padding:14px;transition:border-color .2s,background .2s;';
       if (p.id === selectedPieceId) el.style.borderColor = 'var(--cream)';
+      el.addEventListener('mouseenter', () => {
+        ae.querySelector(`.ae-dot[data-id="${p.id}"]`)?.classList.add('hovered-from-card');
+      });
+      el.addEventListener('mouseleave', () => {
+        ae.querySelector(`.ae-dot[data-id="${p.id}"]`)?.classList.remove('hovered-from-card');
+      });
       el.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
           <div style="font-family:Cormorant Garamond,serif;font-size:16px;">
