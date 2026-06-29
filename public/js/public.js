@@ -553,6 +553,49 @@
       if (open) { positionPopover(w, open); drawConnector(w, open.dataset.piece); }
     }));
     loadFashionNews();
+    setupScrollMeter(insps);
+  }
+
+  function setupScrollMeter(insps) {
+    if (insps.length < 2) return;
+    const section = document.getElementById('tab-inspiration');
+    const articles = [...document.querySelectorAll('.inspiration')];
+    const meter = document.createElement('div');
+    meter.className = 'insp-meter';
+    meter.innerHTML = `
+      <div class="im-fill"></div>
+      <div class="im-dots">
+        ${insps.map((ins, i) => `<button class="im-dot" data-i="${i}" title="${esc(ins.title || ('Look ' + (i+1)))}"><span></span></button>`).join('')}
+      </div>
+      <div class="im-label"><strong>1</strong> / ${insps.length}</div>
+    `;
+    section.appendChild(meter);
+    const dots = [...meter.querySelectorAll('.im-dot')];
+    const fill = meter.querySelector('.im-fill');
+    const label = meter.querySelector('.im-label strong');
+    let active = 0;
+    const setActive = i => {
+      if (i === active) return;
+      active = i;
+      dots.forEach((d, k) => d.classList.toggle('on', k === i));
+      label.textContent = i + 1;
+    };
+    dots.forEach(d => d.addEventListener('click', () => {
+      articles[+d.dataset.i]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) setActive(articles.indexOf(e.target)); });
+    }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+    articles.forEach(a => io.observe(a));
+    // barre de progression globale
+    const onScroll = () => {
+      const sc = document.documentElement;
+      const max = sc.scrollHeight - sc.clientHeight;
+      fill.style.width = max > 0 ? `${Math.min(100, (sc.scrollTop / max) * 100)}%` : '0%';
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    dots[0].classList.add('on');
   }
 
   async function loadFashionNews() {
@@ -566,16 +609,40 @@
       } catch { fashionNewsItems = []; }
     }
     const items = fashionNewsItems;
-    const html = items.length ? items.map(n => `
+    const PER_PAGE = 4;
+    const pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+    const renderItem = n => `
       <a class="news-item" href="${esc(n.link)}" target="_blank" rel="noopener">
         ${n.image ? `<div class="news-thumb"><img src="${esc(n.image)}" alt="" loading="lazy" onerror="this.parentElement.remove();"></div>` : ''}
         <div class="news-body">
           <span class="news-src">${esc(n.source)}</span>
           <span class="news-title">${esc(n.title)}</span>
         </div>
-      </a>`).join('')
-      : '<div class="news-loading">Indisponible pour le moment.</div>';
-    lists.forEach(l => l.innerHTML = html);
+      </a>`;
+    document.querySelectorAll('.insp-news').forEach(aside => {
+      const list = aside.querySelector('.insp-news-list');
+      const nav = aside.querySelector('.news-nav');
+      const countEl = aside.querySelector('.news-count');
+      const prev = aside.querySelector('.news-prev');
+      const next = aside.querySelector('.news-next');
+      if (!items.length) {
+        list.innerHTML = '<div class="news-loading">Indisponible pour le moment.</div>';
+        if (nav) nav.style.display = 'none';
+        return;
+      }
+      let page = 0;
+      const draw = () => {
+        const slice = items.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+        list.innerHTML = slice.map(renderItem).join('');
+        if (countEl) countEl.textContent = `${page + 1}/${pages}`;
+        if (prev) prev.disabled = page === 0;
+        if (next) next.disabled = page >= pages - 1;
+      };
+      if (nav) nav.style.display = pages > 1 ? 'inline-flex' : 'none';
+      prev?.addEventListener('click', () => { if (page > 0) { page--; draw(); } });
+      next?.addEventListener('click', () => { if (page < pages - 1) { page++; draw(); } });
+      draw();
+    });
   }
 
   function renderInspiration(ins) {
@@ -650,7 +717,13 @@
           </div>
         </div>
         <aside class="insp-news">
-          <div class="ix-title">Actualités mode<span>↗</span></div>
+          <div class="ix-title">Actualités mode
+            <span class="news-nav">
+              <button class="news-prev" aria-label="Précédent">‹</button>
+              <span class="news-count"></span>
+              <button class="news-next" aria-label="Suivant">›</button>
+            </span>
+          </div>
           <div class="insp-news-list"><div class="news-loading">Chargement…</div></div>
         </aside>
       </div>
