@@ -592,10 +592,10 @@
         <div class="insp-left ${ins.main_image ? '' : 'placeholder'}">
           ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom>` : ''}
           <svg class="insp-svg" preserveAspectRatio="none"></svg>
-          ${ins.pieces.map(p => `
+          ${ins.pieces.map((p, i) => `
             <div class="anchor-dot" data-piece="${p.id}"
               style="left:${p.anchor_x}%; top:${p.anchor_y}%;"
-              title="${esc(p.label||'')}"></div>
+              title="${esc(p.label||'')}">${i + 1}</div>
           `).join('')}
         </div>
         <div class="insp-right">
