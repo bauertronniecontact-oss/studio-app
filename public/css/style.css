@@ -773,6 +773,7 @@ input, textarea, select { font: inherit; }
 
 /* ── Plein écran sur l'onglet Inspiration ── */
 body.insp-fullscreen { overflow: hidden; }
+body.insp-fullscreen .client-banner { display: none; }
 body.insp-fullscreen #tab-inspiration > .container { max-width: 100%; padding: 0; }
 body.insp-fullscreen #tab-inspiration .section-head { display: none; }
 body.insp-fullscreen .insp-carousel { height: calc(100vh - 64px); align-items: stretch; }
