@@ -740,24 +740,16 @@ input, textarea, select { font: inherit; }
 .ruler-window.dragging { cursor: grabbing; }
 .ruler-tape {
   position: absolute; top: 0; left: 0; height: 100%;
-  /* graduations façon mètre, ancrées en bas, sur toute la longueur */
-  background-repeat: repeat-x;
-  background-image: repeating-linear-gradient(90deg, var(--ink-soft) 0 1px, transparent 1px 9px);
-  background-size: 9px 11px;
-  background-position-y: bottom;
   will-change: transform;
 }
-/* graduations moyennes (plus longues) tous les 5 traits */
-.ruler-tape::before {
-  content: ''; position: absolute; inset: 0;
-  background-repeat: repeat-x;
-  background-image: repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 45px);
-  background-size: 45px 18px;
-  background-position-y: bottom;
-  background-position-x: inherit;
+/* graduations (vrais traits) ancrées en bas, sur toute la longueur */
+.ruler-tape .r-tick {
+  position: absolute; bottom: 0; width: 1px; height: 8px;
+  background: var(--ink-soft); pointer-events: none;
 }
+.ruler-tape .r-tick.major { height: 15px; width: 1px; background: var(--ink); }
 .ruler-mark {
-  position: absolute; bottom: 0; transform: translateX(-50%);
+  position: absolute; bottom: 0; transform: translateX(-50%); z-index: 2;
   background: none; border: none; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0;
 }

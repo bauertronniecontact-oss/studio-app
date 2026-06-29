@@ -592,8 +592,19 @@
       const C = center();
       tape.style.width = (C * 2 + (N - 1) * SEG) + 'px';
       marks.forEach((m, i) => { m.style.left = (C + i * SEG) + 'px'; });
-      // graduations calées sur le 1er numéro (à C)
-      tape.style.backgroundPositionX = C + 'px';
+      // graduations : vrais traits sur toute la longueur, majeurs tous les 5
+      const W = C * 2 + (N - 1) * SEG;
+      tape.querySelectorAll('.r-tick').forEach(t => t.remove());
+      const frag = document.createDocumentFragment();
+      const STEP = 9;
+      for (let x = C % STEP; x <= W; x += STEP) {
+        const t = document.createElement('span');
+        t.className = 'r-tick';
+        if (Math.round((x - C) / STEP) % 5 === 0) t.classList.add('major');
+        t.style.left = x + 'px';
+        frag.appendChild(t);
+      }
+      tape.appendChild(frag);
       update();
     }
     function update() {
