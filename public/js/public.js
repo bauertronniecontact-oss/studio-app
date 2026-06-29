@@ -590,7 +590,8 @@
       <h3>${esc(ins.title || 'Look')} ${totalLabel}</h3>
       <div class="insp-layout">
         <div class="insp-left ${ins.main_image ? '' : 'placeholder'}">
-          ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom>` : ''}
+          ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom onerror="this.remove();this.parentElement.classList.add('placeholder');">` : ''}
+          ${ins.main_image ? '' : '<span class="insp-empty-label">— image du look indisponible —</span>'}
           <svg class="insp-svg" preserveAspectRatio="none"></svg>
           ${ins.pieces.map((p, i) => `
             <div class="anchor-dot" data-piece="${p.id}"
