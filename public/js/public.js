@@ -593,11 +593,19 @@
           ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom onerror="this.remove();this.parentElement.classList.add('placeholder');">` : ''}
           ${ins.main_image ? '' : '<span class="insp-empty-label">— image du look indisponible —</span>'}
           <svg class="insp-svg" preserveAspectRatio="none"></svg>
-          ${ins.pieces.map((p, i) => `
+          ${ins.pieces.map((p, i) => {
+            const r0 = (p.refs && p.refs[0]) || null;
+            return `
             <div class="anchor-dot" data-piece="${p.id}"
-              style="left:${p.anchor_x}%; top:${p.anchor_y}%;"
-              title="${esc(p.label||'')}">${i + 1}</div>
-          `).join('')}
+              style="left:${p.anchor_x}%; top:${p.anchor_y}%;">${i + 1}
+              <div class="anchor-tip">
+                ${r0 && r0.image ? `<img class="at-img" src="${esc(r0.image)}" alt="" onerror="this.remove();">` : ''}
+                <span class="at-label">${esc(p.label || `Pièce ${i + 1}`)}</span>
+                ${r0 && r0.brand ? `<span class="at-brand">${esc(r0.brand)}</span>` : ''}
+                ${r0 && r0.name ? `<span class="at-name">${esc(r0.name)}</span>` : (!r0 ? '<span class="at-name" style="font-style:italic;">— à venir —</span>' : '')}
+              </div>
+            </div>`;
+          }).join('')}
         </div>
         <div class="insp-right">
           ${ins.pieces.map(p => renderPieceBox(p)).join('') || '<div class="empty" style="padding:30px"><div class="e-sub">Pas encore de pièce.</div></div>'}

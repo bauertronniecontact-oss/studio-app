@@ -1639,10 +1639,15 @@
 
   function renderInspEditor(ins) {
     const root = document.createElement('div');
-    root.className = 'panel';
+    root.className = 'panel insp-panel collapsed';
     root.innerHTML = `
-      <div class="panel-head">
-        <h3>${esc(ins.title)} ${ins.is_template ? '<span style="font-size:10px;letter-spacing:0.16em;color:var(--accent);background:rgba(184,145,90,0.12);padding:3px 8px;margin-left:8px;text-transform:uppercase;border-radius:2px;">Template</span>' : ''}</h3>
+      <div class="panel-head insp-head" style="cursor:pointer;">
+        <h3 style="display:flex;align-items:center;gap:8px;">
+          <svg class="insp-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;"><path d="M9 18l6-6-6-6"/></svg>
+          ${esc(ins.title)}
+          <span style="font-size:11px;color:var(--muted);font-family:Inter;">· ${ins.pieces.length} pièce${ins.pieces.length>1?'s':''}</span>
+          ${ins.is_template ? '<span style="font-size:10px;letter-spacing:0.16em;color:var(--accent);background:rgba(184,145,90,0.12);padding:3px 8px;text-transform:uppercase;border-radius:2px;">Template</span>' : ''}
+        </h3>
         <div class="actions">
           <button class="btn btn-ghost btn-sm" data-act="duplicate">Dupliquer</button>
           <button class="btn btn-ghost btn-sm" data-act="template">${ins.is_template?'Retirer du template':'Marquer comme template'}</button>
@@ -1652,6 +1657,7 @@
         </div>
       </div>
 
+      <div class="insp-body">
       <div class="form-row">
         <div class="field" style="grid-column:span 4">
           <label>Image principale du look</label>
@@ -1671,7 +1677,17 @@
       </div>
 
       <div class="pieces-list" style="margin-top:14px;display:flex;flex-direction:column;gap:14px;"></div>
+      </div>
     `;
+
+    // Accordéon : clic sur l'en-tête (hors boutons) ouvre ce panneau et ferme les autres
+    const head = root.querySelector('.insp-head');
+    head.addEventListener('click', e => {
+      if (e.target.closest('.actions')) return;
+      const willOpen = root.classList.contains('collapsed');
+      document.querySelectorAll('.insp-panel').forEach(p => p.classList.add('collapsed'));
+      if (willOpen) root.classList.remove('collapsed');
+    });
 
     const inputImg = root.querySelector('.main-img-input');
     const mainDrop = root.querySelector('.main-img-drop');
