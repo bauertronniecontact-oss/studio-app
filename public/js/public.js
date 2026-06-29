@@ -1,5 +1,6 @@
 /* Studio — vue publique client */
 (async function () {
+  let fashionNewsItems = null;
   const slug = location.pathname.split('/').filter(Boolean)[1];
   if (!slug) { document.body.innerHTML = '<p style="padding:60px;text-align:center;font-family:Cormorant Garamond,serif;font-style:italic;">Lien invalide.</p>'; return; }
 
@@ -554,7 +555,6 @@
     loadFashionNews();
   }
 
-  let fashionNewsItems = null;
   async function loadFashionNews() {
     const lists = document.querySelectorAll('.insp-news-list');
     if (!lists.length) return;
