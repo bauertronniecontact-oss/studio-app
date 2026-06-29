@@ -740,25 +740,26 @@ input, textarea, select { font: inherit; }
 .ruler-window.dragging { cursor: grabbing; }
 .ruler-tape {
   position: absolute; top: 0; left: 0; height: 100%;
-  /* graduations fines tous les 13px, plus marquées tous les 5 */
+  /* graduations façon mètre : fines tous les 10px, moyennes tous les 65px (ancrées en bas) */
+  background-repeat: repeat-x, repeat-x;
   background-image:
-    repeating-linear-gradient(90deg, var(--hairline-strong) 0 1px, transparent 1px 13px);
-  background-position: center top;
-  background-size: 13px 12px; background-repeat: repeat-x;
+    repeating-linear-gradient(90deg, var(--hairline-strong) 0 1px, transparent 1px 10px),
+    repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 65px);
+  background-size: 10px 8px, 65px 14px;
   will-change: transform;
 }
 .ruler-mark {
-  position: absolute; bottom: 4px; transform: translateX(-50%);
+  position: absolute; bottom: 0; transform: translateX(-50%);
   background: none; border: none; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0;
 }
-.ruler-mark .rm-tick { width: 2px; height: 22px; background: var(--ink); transition: background .2s, height .2s; }
 .ruler-mark .rm-num {
   font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
-  color: var(--muted); transition: color .2s, transform .2s;
+  color: var(--muted); transition: color .2s, transform .2s; order: 0;
 }
+.ruler-mark .rm-tick { width: 2px; height: 22px; background: var(--ink); transition: background .2s, height .2s; order: 1; }
 .ruler-mark:hover .rm-tick { background: var(--accent); }
-.ruler-mark.on .rm-tick { background: var(--accent); height: 30px; }
+.ruler-mark.on .rm-tick { background: var(--accent); height: 28px; }
 .ruler-mark.on .rm-num { color: var(--accent); transform: scale(1.2); }
 .ruler-needle {
   position: absolute; left: 50%; top: 4px; bottom: 4px;
