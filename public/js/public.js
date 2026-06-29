@@ -172,6 +172,7 @@
       document.getElementById('tab-inspiration').style.display  = t === 'inspiration' ? '' : 'none';
       const mb = document.getElementById('tab-moodboard');
       if (mb) { mb.style.display = t === 'moodboard' ? '' : 'none'; if (t === 'moodboard') loadMoodboard(); }
+      document.body.classList.toggle('insp-fullscreen', t === 'inspiration' && document.querySelectorAll('.inspiration').length > 0);
     });
   });
 
@@ -562,50 +563,78 @@
     const track = document.getElementById('insp-list');
     track.classList.add('insp-carousel');
     const articles = [...track.querySelectorAll('.inspiration')];
-    const meter = document.createElement('div');
-    meter.className = 'insp-meter';
-    meter.innerHTML = `
-      <button class="im-arrow im-prev" aria-label="Look précédent">‹</button>
-      <div class="im-fill"></div>
-      <div class="im-dots">
-        ${insps.map((ins, i) => `<button class="im-dot" data-i="${i}" title="${esc(ins.title || ('Look ' + (i+1)))}"><span></span></button>`).join('')}
+    const N = insps.length;
+    const SEG = 130; // espacement entre looks sur le ruban (px)
+
+    const ruler = document.createElement('div');
+    ruler.className = 'insp-ruler';
+    ruler.innerHTML = `
+      <button class="ruler-arrow ruler-prev" aria-label="Look précédent">‹</button>
+      <div class="ruler-window">
+        <div class="ruler-tape">
+          ${insps.map((ins, i) => `
+            <button class="ruler-mark" data-i="${i}" title="${esc(ins.title || ('Look ' + (i+1)))}">
+              <span class="rm-tick"></span><span class="rm-num">${i + 1}</span>
+            </button>`).join('')}
+        </div>
       </div>
-      <div class="im-label"><strong>1</strong> / ${insps.length}</div>
-      <button class="im-arrow im-next" aria-label="Look suivant">›</button>
+      <button class="ruler-arrow ruler-next" aria-label="Look suivant">›</button>
+      <div class="ruler-needle"></div>
     `;
-    section.appendChild(meter);
-    const dots = [...meter.querySelectorAll('.im-dot')];
-    const fill = meter.querySelector('.im-fill');
-    const label = meter.querySelector('.im-label strong');
+    section.appendChild(ruler);
+    const win   = ruler.querySelector('.ruler-window');
+    const tape  = ruler.querySelector('.ruler-tape');
+    const marks = [...ruler.querySelectorAll('.ruler-mark')];
     let active = 0;
+
+    function center() { return win.clientWidth / 2; }
+    function layout() {
+      const C = center();
+      tape.style.width = (C * 2 + (N - 1) * SEG) + 'px';
+      marks.forEach((m, i) => { m.style.left = (C + i * SEG) + 'px'; });
+      // alignement des graduations fines avec le 0 du ruban
+      tape.style.backgroundPosition = C + 'px 0';
+      update();
+    }
+    function update() {
+      const max = track.scrollWidth - track.clientWidth;
+      const p = max > 0 ? track.scrollLeft / max : 0;
+      tape.style.transform = `translateX(${-(p * (N - 1) * SEG)}px)`;
+      const idx = Math.round(p * (N - 1));
+      if (idx !== active) { active = idx; marks.forEach((m, k) => m.classList.toggle('on', k === idx)); }
+    }
     const goTo = i => {
       i = Math.max(0, Math.min(i, articles.length - 1));
       track.scrollTo({ left: articles[i].offsetLeft - track.offsetLeft, behavior: 'smooth' });
     };
-    const setActive = i => {
-      active = i;
-      dots.forEach((d, k) => d.classList.toggle('on', k === i));
-      label.textContent = i + 1;
-    };
-    dots.forEach(d => d.addEventListener('click', () => goTo(+d.dataset.i)));
-    meter.querySelector('.im-prev').addEventListener('click', () => goTo(active - 1));
-    meter.querySelector('.im-next').addEventListener('click', () => goTo(active + 1));
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) setActive(articles.indexOf(e.target)); });
-    }, { root: track, rootMargin: '0px -45% 0px -45%', threshold: 0 });
-    articles.forEach(a => io.observe(a));
-    const onScroll = () => {
-      const max = track.scrollWidth - track.clientWidth;
-      fill.style.width = max > 0 ? `${Math.min(100, (track.scrollLeft / max) * 100)}%` : '0%';
-    };
-    track.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    setActive(0);
-    // Flèches clavier
+    marks.forEach(m => m.addEventListener('click', () => goTo(+m.dataset.i)));
+    ruler.querySelector('.ruler-prev').addEventListener('click', () => goTo(active - 1));
+    ruler.querySelector('.ruler-next').addEventListener('click', () => goTo(active + 1));
+
+    // Glisser le ruban pour défiler
+    let dragging = false, startX = 0, startScroll = 0;
+    const maxScroll = () => track.scrollWidth - track.clientWidth;
+    win.addEventListener('pointerdown', e => {
+      dragging = true; startX = e.clientX; startScroll = track.scrollLeft;
+      win.setPointerCapture?.(e.pointerId); win.classList.add('dragging');
+    });
+    win.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const ratio = maxScroll() / ((N - 1) * SEG || 1);
+      track.scrollLeft = startScroll - dx * ratio;
+    });
+    const endDrag = () => { dragging = false; win.classList.remove('dragging'); };
+    win.addEventListener('pointerup', endDrag);
+    win.addEventListener('pointercancel', endDrag);
+
+    track.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', layout);
     section.addEventListener('keydown', e => {
       if (e.key === 'ArrowRight') goTo(active + 1);
       if (e.key === 'ArrowLeft')  goTo(active - 1);
     });
+    requestAnimationFrame(layout);
   }
 
   async function loadFashionNews() {
