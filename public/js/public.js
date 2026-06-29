@@ -547,8 +547,10 @@
     listEl.innerHTML = `<div class="empty"><div class="e-title">Aucune inspiration</div><div class="e-sub">À venir prochainement.</div></div>`;
   } else {
     insps.forEach(ins => listEl.appendChild(renderInspiration(ins)));
-    requestAnimationFrame(() => document.querySelectorAll('.inspiration').forEach(drawLines));
-    window.addEventListener('resize', () => document.querySelectorAll('.inspiration').forEach(drawLines));
+    window.addEventListener('resize', () => document.querySelectorAll('.inspiration').forEach(w => {
+      const open = w.querySelector('.insp-pop.open');
+      if (open) { positionPopover(w, open); drawConnector(w, open.dataset.piece); }
+    }));
   }
 
   function renderInspiration(ins) {
@@ -586,9 +588,6 @@
       ? `<span class="look-total">Total du look · <strong>${currency} ${Math.round(total).toLocaleString('fr-CH')}</strong></span>`
       : '';
 
-    // Répartition gauche/droite selon la position horizontale de l'ancre
-    const leftPieces  = ins.pieces.filter(p => (p.anchor_x ?? 50) < 50);
-    const rightPieces = ins.pieces.filter(p => (p.anchor_x ?? 50) >= 50);
     const pieceIndex = new Map(ins.pieces.map((p, i) => [p.id, i]));
 
     wrap.innerHTML = `
@@ -598,9 +597,6 @@
       </div>
       <div class="insp-stage">
         <svg class="insp-svg" preserveAspectRatio="none"></svg>
-        <div class="insp-col insp-col-left">
-          ${leftPieces.map(p => renderPieceCard(p, pieceIndex.get(p.id))).join('')}
-        </div>
         <div class="insp-figure ${ins.main_image ? '' : 'placeholder'}">
           ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom onerror="this.remove();this.parentElement.classList.add('placeholder');">` : ''}
           ${ins.main_image ? '' : '<span class="insp-empty-label">— image du look indisponible —</span>'}
@@ -610,9 +606,10 @@
               title="${esc(p.label||'')}">${i + 1}</div>
           `).join('')}
         </div>
-        <div class="insp-col insp-col-right">
-          ${rightPieces.map(p => renderPieceCard(p, pieceIndex.get(p.id))).join('')}
+        <div class="insp-pop-layer">
+          ${ins.pieces.map(p => `<div class="insp-pop" data-piece="${p.id}" data-side="${(p.anchor_x ?? 50) < 50 ? 'left' : 'right'}">${renderPieceCard(p, pieceIndex.get(p.id))}</div>`).join('')}
         </div>
+        ${ins.pieces.length ? `<div class="insp-hint">Cliquez un repère pour voir la pièce</div>` : ''}
       </div>
       <div class="insp-sheet" aria-hidden="true">
         <div class="insp-sheet-inner"></div>
@@ -631,28 +628,87 @@
         openLightbox(mainImg.src);
       });
     }
-    const cards = wrap.querySelectorAll('.piece-card');
     const dots  = wrap.querySelectorAll('.anchor-dot');
     const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
 
-    // Hover sync desktop
-    cards.forEach(card => {
-      const id = card.dataset.piece;
-      card.addEventListener('mouseenter', () => { if (!isMobile()) highlight(wrap, id, true); });
-      card.addEventListener('mouseleave', () => { if (!isMobile()) highlight(wrap, id, false); });
-    });
     dots.forEach(d => {
       const id = d.dataset.piece;
-      d.addEventListener('mouseenter', () => { if (!isMobile()) highlight(wrap, id, true); });
-      d.addEventListener('mouseleave', () => { if (!isMobile()) highlight(wrap, id, false); });
-      d.addEventListener('click', () => {
-        track('click_hotspot', { target_id: ins.id, meta: { piece_id: d.dataset.piece } });
-        if (isMobile()) openSheet(wrap, d.dataset.piece);
+      d.addEventListener('mouseenter', () => { if (!isMobile() && !wrap.querySelector('.insp-pop.open')) highlight(wrap, id, true); });
+      d.addEventListener('mouseleave', () => { if (!isMobile() && !wrap.querySelector('.insp-pop.open')) highlight(wrap, id, false); });
+      d.addEventListener('click', e => {
+        e.stopPropagation();
+        track('click_hotspot', { target_id: ins.id, meta: { piece_id: id } });
+        if (isMobile()) openSheet(wrap, id);
+        else togglePopover(wrap, id);
       });
     });
+    // Fermer les fenêtres en cliquant ailleurs
+    wrap.addEventListener('click', e => {
+      if (!e.target.closest('.insp-pop') && !e.target.closest('.anchor-dot')) closePopovers(wrap);
+    });
     bindCardControls(wrap);
-    requestAnimationFrame(() => drawLines(wrap));
     return wrap;
+  }
+
+  function togglePopover(wrap, pieceId) {
+    const pop = wrap.querySelector(`.insp-pop[data-piece="${pieceId}"]`);
+    if (!pop) return;
+    if (pop.classList.contains('open')) { closePopovers(wrap); return; }
+    closePopovers(wrap);
+    positionPopover(wrap, pop);
+    pop.classList.add('open');
+    highlight(wrap, pieceId, true);
+    requestAnimationFrame(() => drawConnector(wrap, pieceId));
+  }
+  function closePopovers(wrap) {
+    wrap.querySelectorAll('.insp-pop.open').forEach(p => { p.classList.remove('open'); highlight(wrap, p.dataset.piece, false); });
+    const svg = wrap.querySelector('.insp-svg'); if (svg) svg.innerHTML = '';
+  }
+  function positionPopover(wrap, pop) {
+    const stage = wrap.querySelector('.insp-stage');
+    const fig   = wrap.querySelector('.insp-figure');
+    const dot   = wrap.querySelector(`.anchor-dot[data-piece="${pop.dataset.piece}"]`);
+    if (!stage || !fig || !dot) return;
+    const sr = stage.getBoundingClientRect();
+    const fr = fig.getBoundingClientRect();
+    const side = pop.dataset.side;
+    const gap = 36;
+    const popW = pop.offsetWidth || 280;
+    let x = side === 'left' ? (fr.left - sr.left - gap - popW) : (fr.right - sr.left + gap);
+    // si pas la place du côté choisi, basculer
+    if (side === 'left' && x < 0) x = fr.right - sr.left + gap;
+    if (side === 'right' && x + popW > sr.width) x = fr.left - sr.left - gap - popW;
+    x = Math.max(0, Math.min(x, sr.width - popW));
+    const dotY = (fr.top - sr.top) + (parseFloat(dot.style.top) / 100) * fr.height;
+    let y = dotY - 40;
+    const popH = pop.offsetHeight || 320;
+    y = Math.max(0, Math.min(y, sr.height - popH));
+    pop.style.left = x + 'px';
+    pop.style.top  = y + 'px';
+  }
+  function drawConnector(wrap, pieceId) {
+    const stage = wrap.querySelector('.insp-stage');
+    const fig   = wrap.querySelector('.insp-figure');
+    const svg   = wrap.querySelector('.insp-svg');
+    const dot   = wrap.querySelector(`.anchor-dot[data-piece="${pieceId}"]`);
+    const pop   = wrap.querySelector(`.insp-pop[data-piece="${pieceId}"]`);
+    if (!stage || !fig || !svg || !dot || !pop) return;
+    const sr = stage.getBoundingClientRect();
+    const fr = fig.getBoundingClientRect();
+    const pr = pop.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${sr.width} ${sr.height}`);
+    svg.setAttribute('width', sr.width); svg.setAttribute('height', sr.height);
+    svg.innerHTML = '';
+    const dx = (fr.left - sr.left) + (parseFloat(dot.style.left) / 100) * fr.width;
+    const dy = (fr.top  - sr.top)  + (parseFloat(dot.style.top)  / 100) * fr.height;
+    const popCenterX = pr.left - sr.left + pr.width / 2;
+    const tx = popCenterX < (fr.left - sr.left + fr.width / 2) ? (pr.right - sr.left) : (pr.left - sr.left);
+    const ty = (pr.top - sr.top) + 30;
+    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    ln.setAttribute('x1', dx); ln.setAttribute('y1', dy);
+    ln.setAttribute('x2', tx); ln.setAttribute('y2', ty);
+    ln.setAttribute('data-piece', pieceId); ln.classList.add('active');
+    svg.appendChild(ln);
   }
 
   // Carte pièce style "ARK/8"
@@ -749,37 +805,6 @@
     wrap.querySelectorAll(`line[data-piece="${pieceId}"]`).forEach(l => l.classList.toggle('active', on));
   }
 
-  function drawLines(wrap) {
-    const stage = wrap.querySelector('.insp-stage');
-    const fig = wrap.querySelector('.insp-figure');
-    const svg = wrap.querySelector('.insp-svg');
-    if (!stage || !fig || !svg) return;
-    if (window.matchMedia('(max-width: 820px)').matches) { svg.innerHTML = ''; return; }
-    const sr = stage.getBoundingClientRect();
-    const fr = fig.getBoundingClientRect();
-    svg.setAttribute('viewBox', `0 0 ${sr.width} ${sr.height}`);
-    svg.setAttribute('width', sr.width);
-    svg.setAttribute('height', sr.height);
-    svg.innerHTML = '';
-    wrap.querySelectorAll('.anchor-dot').forEach(dot => {
-      const pid = dot.dataset.piece;
-      const card = wrap.querySelector(`.piece-card[data-piece="${pid}"]`);
-      if (!card) return;
-      // point d'ancrage sur l'image (coordonnées relatives au stage)
-      const dx = (fr.left - sr.left) + (parseFloat(dot.style.left) / 100) * fr.width;
-      const dy = (fr.top  - sr.top)  + (parseFloat(dot.style.top)  / 100) * fr.height;
-      // point cible : bord de la carte le plus proche de l'image
-      const cr = card.getBoundingClientRect();
-      const onLeft = (cr.left - sr.left + cr.width / 2) < sr.width / 2;
-      const targetX = onLeft ? (cr.right - sr.left) : (cr.left - sr.left);
-      const targetY = (cr.top - sr.top) + Math.min(cr.height / 2, 26);
-      const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      ln.setAttribute('x1', dx); ln.setAttribute('y1', dy);
-      ln.setAttribute('x2', targetX); ln.setAttribute('y2', targetY);
-      ln.setAttribute('data-piece', pid);
-      svg.appendChild(ln);
-    });
-  }
 
   function esc(s) {
     return String(s == null ? '' : s)
