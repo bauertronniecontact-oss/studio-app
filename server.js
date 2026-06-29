@@ -1092,6 +1092,52 @@ app.get('/c/auth/me', ah(async (req, res) => {
 /* ═══════════════════════════════════════════ */
 const SHOPPER_PUBLIC_FIELDS = 'id, name, studio_name, studio_logo, accent_color, photo_url, bio, portfolio, specialties, years_experience, public_slug, public_tagline, public_city';
 
+/* ─── Fil d'actualité mode (RSS, cache 30 min) ─── */
+const FASHION_FEEDS = [
+  { source: 'Hypebeast', url: 'https://hypebeast.com/feed' },
+  { source: 'Vogue',     url: 'https://www.vogue.com/feed/rss' },
+  { source: 'BoF',       url: 'https://www.businessoffashion.com/feed/' },
+  { source: 'Highsnobiety', url: 'https://www.highsnobiety.com/feed/' },
+];
+let fashionCache = { at: 0, items: [] };
+function parseRssItems(xml, source) {
+  const items = [];
+  const blocks = xml.split(/<item[\s>]/i).slice(1);
+  for (const b of blocks.slice(0, 8)) {
+    const pick = (re) => { const m = b.match(re); return m ? m[1].trim() : ''; };
+    const decodeCdata = s => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, '').trim();
+    let title = decodeCdata(pick(/<title>([\s\S]*?)<\/title>/i));
+    let link  = pick(/<link>([\s\S]*?)<\/link>/i) || pick(/<link[^>]*href=["']([^"']+)["']/i);
+    const date = pick(/<pubDate>([\s\S]*?)<\/pubDate>/i) || pick(/<dc:date>([\s\S]*?)<\/dc:date>/i);
+    let img = pick(/<media:content[^>]*url=["']([^"']+)["']/i)
+           || pick(/<media:thumbnail[^>]*url=["']([^"']+)["']/i)
+           || pick(/<enclosure[^>]*url=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i);
+    if (!img) { const d = pick(/<description>([\s\S]*?)<\/description>/i); const im = d.match(/<img[^>]+src=["']([^"']+)["']/i); if (im) img = im[1]; }
+    title = title.replace(/&amp;/g,'&').replace(/&#8217;/g,'’').replace(/&#8211;/g,'–').replace(/&quot;/g,'"').replace(/&#039;/g,"'");
+    if (title && link) items.push({ source, title: title.slice(0, 140), link: link.trim(), date, image: img || '' });
+  }
+  return items;
+}
+app.get('/api/fashion-news', ah(async (req, res) => {
+  const now = Date.now();
+  if (now - fashionCache.at < 30 * 60 * 1000 && fashionCache.items.length) {
+    return res.json({ items: fashionCache.items, cached: true });
+  }
+  const results = await Promise.allSettled(FASHION_FEEDS.map(async f => {
+    const ctrl = AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined;
+    const r = await fetch(f.url, { headers: { 'User-Agent': 'Mozilla/5.0 StudioBot', 'Accept': 'application/rss+xml,application/xml,text/xml' }, signal: ctrl });
+    if (!r.ok) throw new Error(f.source + ' ' + r.status);
+    return parseRssItems(await r.text(), f.source);
+  }));
+  let merged = [];
+  results.forEach(r => { if (r.status === 'fulfilled') merged.push(...r.value.slice(0, 4)); });
+  // entrelacer par source + trier par date
+  merged.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  merged = merged.slice(0, 14);
+  if (merged.length) fashionCache = { at: now, items: merged };
+  res.json({ items: merged.length ? merged : fashionCache.items, cached: false });
+}));
+
 app.get('/api/discover', ah(async (req, res) => {
   const { data, error } = await sb.from('users')
     .select(SHOPPER_PUBLIC_FIELDS)

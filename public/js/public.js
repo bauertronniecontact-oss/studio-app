@@ -551,6 +551,31 @@
       const open = w.querySelector('.insp-pop.open');
       if (open) { positionPopover(w, open); drawConnector(w, open.dataset.piece); }
     }));
+    loadFashionNews();
+  }
+
+  let fashionNewsItems = null;
+  async function loadFashionNews() {
+    const lists = document.querySelectorAll('.insp-news-list');
+    if (!lists.length) return;
+    if (!fashionNewsItems) {
+      try {
+        const r = await fetch('/api/fashion-news');
+        const d = await r.json();
+        fashionNewsItems = Array.isArray(d.items) ? d.items : [];
+      } catch { fashionNewsItems = []; }
+    }
+    const items = fashionNewsItems;
+    const html = items.length ? items.map(n => `
+      <a class="news-item" href="${esc(n.link)}" target="_blank" rel="noopener">
+        ${n.image ? `<div class="news-thumb"><img src="${esc(n.image)}" alt="" loading="lazy" onerror="this.parentElement.remove();"></div>` : ''}
+        <div class="news-body">
+          <span class="news-src">${esc(n.source)}</span>
+          <span class="news-title">${esc(n.title)}</span>
+        </div>
+      </a>`).join('')
+      : '<div class="news-loading">Indisponible pour le moment.</div>';
+    lists.forEach(l => l.innerHTML = html);
   }
 
   function renderInspiration(ins) {
@@ -624,6 +649,10 @@
             ${ins.pieces.map(p => `<div class="insp-pop" data-piece="${p.id}" data-side="right">${renderPieceCard(p, pieceIndex.get(p.id))}</div>`).join('')}
           </div>
         </div>
+        <aside class="insp-news">
+          <div class="ix-title">Actualités mode<span>↗</span></div>
+          <div class="insp-news-list"><div class="news-loading">Chargement…</div></div>
+        </aside>
       </div>
       <div class="insp-sheet" aria-hidden="true">
         <div class="insp-sheet-inner"></div>
