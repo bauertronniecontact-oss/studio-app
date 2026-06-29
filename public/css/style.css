@@ -593,7 +593,7 @@ input, textarea, select { font: inherit; }
 
 .insp-figure {
   position: relative;
-  width: 100%; max-width: 360px;
+  width: 100%; max-width: 340px;
   background: var(--visual);
   aspect-ratio: 3/4; overflow: visible;
   z-index: 2;
@@ -632,7 +632,7 @@ input, textarea, select { font: inherit; }
 /* ── Fenêtres pièces (popover desktop) ── */
 .insp-pop-layer { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
 .insp-pop {
-  position: absolute; width: 280px;
+  position: absolute; width: 250px;
   pointer-events: none;
   opacity: 0; transform: scale(0.96) translateY(6px);
   transition: opacity .22s cubic-bezier(.2,.8,.2,1), transform .22s cubic-bezier(.2,.8,.2,1);
