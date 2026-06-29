@@ -837,21 +837,12 @@
     if (!canvas || !fig || !dot) return;
     const sr = canvas.getBoundingClientRect();
     const fr = fig.getBoundingClientRect();
-    const gap = 26;
-    const popW = pop.offsetWidth || 250;
-    const figLeft  = fr.left  - sr.left;
-    const figRight = fr.right - sr.left;
-    const leftGap  = figLeft;
-    const rightGap = sr.width - figRight;
-    let x, side;
-    if (rightGap >= leftGap) {            // ouvre dans l'espace de droite
-      side = 'right';
-      x = Math.min(figRight + gap, sr.width - popW);
-    } else {                               // ouvre dans l'espace de gauche
-      side = 'left';
-      x = Math.max(figLeft - gap - popW, 0);
-    }
-    pop.dataset.side = side;
+    const gap = 24;
+    const popW = pop.offsetWidth || 230;
+    // Ouvre à droite de l'image; bascule à gauche si pas la place
+    let x = (fr.right - sr.left) + gap;
+    if (x + popW > sr.width) x = (fr.left - sr.left) - gap - popW;
+    x = Math.max(0, Math.min(x, sr.width - popW));
     const dotY = (fr.top - sr.top) + (parseFloat(dot.style.top) / 100) * fr.height;
     const popH = pop.offsetHeight || 320;
     let y = dotY - 40;
