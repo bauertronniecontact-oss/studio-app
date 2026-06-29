@@ -586,34 +586,40 @@
       ? `<span class="look-total">Total du look · <strong>${currency} ${Math.round(total).toLocaleString('fr-CH')}</strong></span>`
       : '';
 
+    // Répartition gauche/droite selon la position horizontale de l'ancre
+    const leftPieces  = ins.pieces.filter(p => (p.anchor_x ?? 50) < 50);
+    const rightPieces = ins.pieces.filter(p => (p.anchor_x ?? 50) >= 50);
+    const pieceIndex = new Map(ins.pieces.map((p, i) => [p.id, i]));
+
     wrap.innerHTML = `
-      <h3>${esc(ins.title || 'Look')} ${totalLabel}</h3>
-      <div class="insp-layout">
-        <div class="insp-left ${ins.main_image ? '' : 'placeholder'}">
+      <div class="insp-head-row">
+        <h3>${esc(ins.title || 'Look')}</h3>
+        ${totalLabel}
+      </div>
+      <div class="insp-stage">
+        <svg class="insp-svg" preserveAspectRatio="none"></svg>
+        <div class="insp-col insp-col-left">
+          ${leftPieces.map(p => renderPieceCard(p, pieceIndex.get(p.id))).join('')}
+        </div>
+        <div class="insp-figure ${ins.main_image ? '' : 'placeholder'}">
           ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom onerror="this.remove();this.parentElement.classList.add('placeholder');">` : ''}
           ${ins.main_image ? '' : '<span class="insp-empty-label">— image du look indisponible —</span>'}
-          <svg class="insp-svg" preserveAspectRatio="none"></svg>
-          ${ins.pieces.map((p, i) => {
-            const r0 = (p.refs && p.refs[0]) || null;
-            return `
+          ${ins.pieces.map((p, i) => `
             <div class="anchor-dot" data-piece="${p.id}"
-              style="left:${p.anchor_x}%; top:${p.anchor_y}%;">${i + 1}
-              <div class="anchor-tip">
-                ${r0 && r0.image ? `<img class="at-img" src="${esc(r0.image)}" alt="" onerror="this.remove();">` : ''}
-                <span class="at-label">${esc(p.label || `Pièce ${i + 1}`)}</span>
-                ${r0 && r0.brand ? `<span class="at-brand">${esc(r0.brand)}</span>` : ''}
-                ${r0 && r0.name ? `<span class="at-name">${esc(r0.name)}</span>` : (!r0 ? '<span class="at-name" style="font-style:italic;">— à venir —</span>' : '')}
-              </div>
-            </div>`;
-          }).join('')}
+              style="left:${p.anchor_x}%; top:${p.anchor_y}%;"
+              title="${esc(p.label||'')}">${i + 1}</div>
+          `).join('')}
         </div>
-        <div class="insp-right">
-          ${ins.pieces.map(p => renderPieceBox(p)).join('') || '<div class="empty" style="padding:30px"><div class="e-sub">Pas encore de pièce.</div></div>'}
+        <div class="insp-col insp-col-right">
+          ${rightPieces.map(p => renderPieceCard(p, pieceIndex.get(p.id))).join('')}
         </div>
+      </div>
+      <div class="insp-sheet" aria-hidden="true">
+        <div class="insp-sheet-inner"></div>
       </div>
     `;
     // image cliquable → lightbox + tracking
-    const mainImg = wrap.querySelector('.insp-left img[data-zoom]');
+    const mainImg = wrap.querySelector('.insp-figure img[data-zoom]');
     if (mainImg) {
       mainImg.addEventListener('click', (e) => {
         const r = mainImg.getBoundingClientRect();
@@ -625,112 +631,148 @@
         openLightbox(mainImg.src);
       });
     }
-    // dots tracking
-    wrap.querySelectorAll('.anchor-dot').forEach(d => {
-      d.addEventListener('click', () => track('click_hotspot', { target_id: ins.id, meta: { piece_id: d.dataset.piece } }));
-    });
-    const boxes = wrap.querySelectorAll('.piece-box');
+    const cards = wrap.querySelectorAll('.piece-card');
     const dots  = wrap.querySelectorAll('.anchor-dot');
-    boxes.forEach(box => {
-      const id = box.dataset.piece;
-      box.addEventListener('mouseenter', () => highlight(wrap, id, true));
-      box.addEventListener('mouseleave', () => highlight(wrap, id, false));
+    const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
+
+    // Hover sync desktop
+    cards.forEach(card => {
+      const id = card.dataset.piece;
+      card.addEventListener('mouseenter', () => { if (!isMobile()) highlight(wrap, id, true); });
+      card.addEventListener('mouseleave', () => { if (!isMobile()) highlight(wrap, id, false); });
     });
     dots.forEach(d => {
       const id = d.dataset.piece;
-      d.addEventListener('mouseenter', () => highlight(wrap, id, true));
-      d.addEventListener('mouseleave', () => highlight(wrap, id, false));
+      d.addEventListener('mouseenter', () => { if (!isMobile()) highlight(wrap, id, true); });
+      d.addEventListener('mouseleave', () => { if (!isMobile()) highlight(wrap, id, false); });
+      d.addEventListener('click', () => {
+        track('click_hotspot', { target_id: ins.id, meta: { piece_id: d.dataset.piece } });
+        if (isMobile()) openSheet(wrap, d.dataset.piece);
+      });
     });
-    wrap.querySelectorAll('.piece-box').forEach(box => {
-      const prev = box.querySelector('.pb-prev');
-      const next = box.querySelector('.pb-next');
-      if (prev) prev.addEventListener('click', () => navRef(box, -1));
-      if (next) next.addEventListener('click', () => navRef(box, +1));
-      box.querySelectorAll('.pb-link').forEach(a =>
-        a.addEventListener('click', () => track('click_ref', { target_id: +box.dataset.piece })));
-      const v = box.querySelector('.pb-visual img');
-      if (v) v.addEventListener('click', () => openLightbox(v.src));
-    });
+    bindCardControls(wrap);
+    requestAnimationFrame(() => drawLines(wrap));
     return wrap;
   }
 
-  function renderPieceBox(p) {
-    if (!p.refs.length) {
-      return `<div class="piece-box" data-piece="${p.id}">
-        <div class="pb-visual"></div>
-        <div class="pb-body">
-          <span class="pb-label">${esc(p.label || '')}</span>
-          <span class="pb-name" style="font-style:italic;color:#999">— aucune référence —</span>
-        </div>
+  // Carte pièce style "ARK/8"
+  function renderPieceCard(p, idx) {
+    const num = (idx ?? 0) + 1;
+    if (!p.refs || !p.refs.length) {
+      return `<div class="piece-card" data-piece="${p.id}">
+        <div class="pc-head"><span class="pc-num">${num}</span><span class="pc-label">${esc(p.label || 'Pièce')}</span></div>
+        <div class="pc-empty">— référence à venir —</div>
       </div>`;
     }
     const refsJson = encodeURIComponent(JSON.stringify(p.refs));
-    return `<div class="piece-box" data-piece="${p.id}" data-refs="${refsJson}" data-idx="0">
-      <div class="pb-visual">${p.refs[0].image ? `<img src="${esc(p.refs[0].image)}" alt="">` : ''}</div>
-      <div class="pb-body">
-        <span class="pb-label">${esc(p.label || '')}</span>
-        <span class="pb-brand">${esc(p.refs[0].brand || '')}</span>
-        <span class="pb-name">${esc(p.refs[0].name || '')}</span>
-        ${p.refs[0].link ? `<a class="pb-link" href="${esc(p.refs[0].link)}" target="_blank" rel="noopener">Voir →</a>` : ''}
+    const r0 = p.refs[0];
+    return `<div class="piece-card" data-piece="${p.id}" data-refs="${refsJson}" data-idx="0">
+      <div class="pc-head">
+        <span class="pc-num">${num}</span>
+        <span class="pc-label">${esc(p.label || 'Pièce')}</span>
+        ${p.refs.length > 1 ? `<span class="pc-counter">1/${p.refs.length}</span>` : ''}
       </div>
-      ${p.refs.length > 1 ? `
-      <div class="pb-nav">
-        <button class="pb-prev" aria-label="Précédent">◀</button>
-        <div class="pb-counter">1/${p.refs.length}</div>
-        <button class="pb-next" aria-label="Suivant">▶</button>
-      </div>` : ''}
+      <div class="pc-visual">${r0.image ? `<img src="${esc(r0.image)}" alt="" onerror="this.remove();">` : ''}</div>
+      <div class="pc-brand">${esc(r0.brand || '')}</div>
+      <div class="pc-name">${esc(r0.name || '')}</div>
+      <div class="pc-foot">
+        ${r0.link ? `<a class="pc-link" href="${esc(r0.link)}" target="_blank" rel="noopener">Voir le produit →</a>` : '<span></span>'}
+        ${p.refs.length > 1 ? `<div class="pc-nav"><button class="pc-prev" aria-label="Précédent">‹</button><button class="pc-next" aria-label="Suivant">›</button></div>` : ''}
+      </div>
     </div>`;
   }
 
+  function bindCardControls(scope) {
+    scope.querySelectorAll('.piece-card').forEach(card => {
+      const prev = card.querySelector('.pc-prev');
+      const next = card.querySelector('.pc-next');
+      if (prev) prev.addEventListener('click', e => { e.stopPropagation(); navRef(card, -1); });
+      if (next) next.addEventListener('click', e => { e.stopPropagation(); navRef(card, +1); });
+      card.querySelectorAll('.pc-link').forEach(a =>
+        a.addEventListener('click', e => { e.stopPropagation(); track('click_ref', { target_id: +card.dataset.piece }); }));
+      const v = card.querySelector('.pc-visual img');
+      if (v) v.addEventListener('click', () => openLightbox(v.src));
+    });
+  }
+
+  // Mobile : ouvre la fiche en superposition (bottom sheet)
+  function openSheet(wrap, pieceId) {
+    const sheet = wrap.querySelector('.insp-sheet');
+    const card  = wrap.querySelector(`.piece-card[data-piece="${pieceId}"]`);
+    if (!sheet || !card) return;
+    sheet.querySelector('.insp-sheet-inner').innerHTML = card.outerHTML;
+    bindCardControls(sheet);
+    sheet.querySelector('.piece-card')?.insertAdjacentHTML('afterbegin', '<button class="insp-sheet-close" aria-label="Fermer">×</button>');
+    sheet.querySelector('.insp-sheet-close')?.addEventListener('click', () => closeSheet(wrap));
+    sheet.classList.add('open');
+    sheet.setAttribute('aria-hidden', 'false');
+    const onBackdrop = e => { if (e.target === sheet) { closeSheet(wrap); sheet.removeEventListener('click', onBackdrop); } };
+    sheet.addEventListener('click', onBackdrop);
+  }
+  function closeSheet(wrap) {
+    const sheet = wrap.querySelector('.insp-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('open');
+    sheet.setAttribute('aria-hidden', 'true');
+  }
+
   function navRef(box, dir) {
-    const refs = JSON.parse(decodeURIComponent(box.dataset.refs));
-    let idx = parseInt(box.dataset.idx) + dir;
+    const refs = JSON.parse(decodeURIComponent(box.dataset.refs || '%5B%5D'));
+    if (!refs.length) return;
+    let idx = parseInt(box.dataset.idx || '0') + dir;
     if (idx < 0) idx = refs.length - 1;
     if (idx >= refs.length) idx = 0;
     box.dataset.idx = idx;
     const r = refs[idx];
-    box.querySelector('.pb-visual').innerHTML = r.image ? `<img src="${esc(r.image)}" alt="">` : '';
-    box.querySelector('.pb-brand').textContent = r.brand || '';
-    box.querySelector('.pb-name').textContent  = r.name  || '';
-    let linkEl = box.querySelector('.pb-link');
+    box.querySelector('.pc-visual').innerHTML = r.image ? `<img src="${esc(r.image)}" alt="" onerror="this.remove();">` : '';
+    box.querySelector('.pc-brand').textContent = r.brand || '';
+    box.querySelector('.pc-name').textContent  = r.name  || '';
+    let linkEl = box.querySelector('.pc-link');
     if (r.link) {
       if (linkEl) linkEl.href = r.link;
       else {
         const a = document.createElement('a');
-        a.className = 'pb-link'; a.target = '_blank'; a.rel = 'noopener';
-        a.href = r.link; a.textContent = 'Voir →';
-        box.querySelector('.pb-body').appendChild(a);
+        a.className = 'pc-link'; a.target = '_blank'; a.rel = 'noopener';
+        a.href = r.link; a.textContent = 'Voir le produit →';
+        box.querySelector('.pc-foot')?.prepend(a);
       }
     } else if (linkEl) linkEl.remove();
-    box.querySelector('.pb-counter').textContent = `${idx+1}/${refs.length}`;
-    const v = box.querySelector('.pb-visual img');
+    const counter = box.querySelector('.pc-counter');
+    if (counter) counter.textContent = `${idx+1}/${refs.length}`;
+    const v = box.querySelector('.pc-visual img');
     if (v) v.addEventListener('click', () => openLightbox(v.src));
   }
 
   function highlight(wrap, pieceId, on) {
-    wrap.querySelectorAll(`.piece-box[data-piece="${pieceId}"]`).forEach(b => b.classList.toggle('active', on));
+    wrap.querySelectorAll(`.piece-card[data-piece="${pieceId}"]`).forEach(b => b.classList.toggle('active', on));
     wrap.querySelectorAll(`.anchor-dot[data-piece="${pieceId}"]`).forEach(d => d.classList.toggle('active', on));
     wrap.querySelectorAll(`line[data-piece="${pieceId}"]`).forEach(l => l.classList.toggle('active', on));
   }
 
   function drawLines(wrap) {
-    const left = wrap.querySelector('.insp-left');
+    const stage = wrap.querySelector('.insp-stage');
+    const fig = wrap.querySelector('.insp-figure');
     const svg = wrap.querySelector('.insp-svg');
-    if (!left || !svg) return;
-    const lr = left.getBoundingClientRect();
-    svg.setAttribute('viewBox', `0 0 ${lr.width} ${lr.height}`);
-    svg.setAttribute('width', lr.width);
-    svg.setAttribute('height', lr.height);
+    if (!stage || !fig || !svg) return;
+    if (window.matchMedia('(max-width: 820px)').matches) { svg.innerHTML = ''; return; }
+    const sr = stage.getBoundingClientRect();
+    const fr = fig.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${sr.width} ${sr.height}`);
+    svg.setAttribute('width', sr.width);
+    svg.setAttribute('height', sr.height);
     svg.innerHTML = '';
     wrap.querySelectorAll('.anchor-dot').forEach(dot => {
       const pid = dot.dataset.piece;
-      const box = wrap.querySelector(`.piece-box[data-piece="${pid}"]`);
-      if (!box) return;
-      const dx = (parseFloat(dot.style.left) / 100) * lr.width;
-      const dy = (parseFloat(dot.style.top)  / 100) * lr.height;
-      const br = box.getBoundingClientRect();
-      const targetX = lr.width + (br.left - lr.right);
-      const targetY = (br.top + br.height/2) - lr.top;
+      const card = wrap.querySelector(`.piece-card[data-piece="${pid}"]`);
+      if (!card) return;
+      // point d'ancrage sur l'image (coordonnées relatives au stage)
+      const dx = (fr.left - sr.left) + (parseFloat(dot.style.left) / 100) * fr.width;
+      const dy = (fr.top  - sr.top)  + (parseFloat(dot.style.top)  / 100) * fr.height;
+      // point cible : bord de la carte le plus proche de l'image
+      const cr = card.getBoundingClientRect();
+      const onLeft = (cr.left - sr.left + cr.width / 2) < sr.width / 2;
+      const targetX = onLeft ? (cr.right - sr.left) : (cr.left - sr.left);
+      const targetY = (cr.top - sr.top) + Math.min(cr.height / 2, 26);
       const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       ln.setAttribute('x1', dx); ln.setAttribute('y1', dy);
       ln.setAttribute('x2', targetX); ln.setAttribute('y2', targetY);
