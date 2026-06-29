@@ -771,25 +771,37 @@ input, textarea, select { font: inherit; }
 }
 @media (max-width: 820px) { .insp-ruler { bottom: 12px; width: 94vw; padding: 4px 6px; } }
 
-/* ── Plein écran sur l'onglet Inspiration ── */
-body.insp-fullscreen { overflow: hidden; }
+/* ── Plein écran sur l'onglet Inspiration (aucun scroll) ── */
+body.insp-fullscreen { overflow: hidden; height: 100vh; }
 body.insp-fullscreen .client-banner { display: none; }
-body.insp-fullscreen #tab-inspiration > .container { max-width: 100%; padding: 0; }
+body.insp-fullscreen #tab-inspiration {
+  position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+  overflow: hidden; z-index: 50; background: var(--bg);
+}
+body.insp-fullscreen #tab-inspiration > .container { max-width: 100%; padding: 0; height: 100%; }
 body.insp-fullscreen #tab-inspiration .section-head { display: none; }
-body.insp-fullscreen .insp-carousel { height: calc(100vh - 64px); align-items: stretch; }
+body.insp-fullscreen .insp-carousel { height: 100%; align-items: stretch; }
 body.insp-fullscreen .insp-carousel .inspiration {
   height: 100%; overflow: hidden;
   display: flex; flex-direction: column; justify-content: flex-start;
-  padding: 18px 40px 96px;
+  padding: 16px 32px 92px;
 }
-body.insp-fullscreen .insp-head-row { margin-bottom: 14px; flex-shrink: 0; }
-body.insp-fullscreen .insp-stage { flex: 1; min-height: 0; align-items: center; }
+body.insp-fullscreen .insp-head-row { margin: 0 auto 12px; flex-shrink: 0; width: min(1180px, 100%); }
+/* Zones resserrées et centrées pour combler le vide */
+body.insp-fullscreen .insp-stage {
+  flex: 1; min-height: 0; align-items: center; justify-content: center;
+  width: min(1180px, 100%); margin: 0 auto;
+  grid-template-columns: 200px minmax(0, 1fr) 240px; gap: 24px;
+}
 body.insp-fullscreen .insp-canvas { min-height: 0; height: 100%; }
-/* Image dimensionnée pour tenir dans la hauteur dispo */
+/* Image dimensionnée par la hauteur dispo (plus grande, comble le centre) */
 body.insp-fullscreen .insp-figure {
-  width: auto; height: min(64vh, 540px); max-width: none; aspect-ratio: 3/4;
+  width: auto; height: min(72vh, 600px); max-width: 100%; aspect-ratio: 3/4;
 }
-body.insp-fullscreen .insp-index, body.insp-fullscreen .insp-news { align-self: center; }
+body.insp-fullscreen .insp-index, body.insp-fullscreen .insp-news { align-self: center; position: static; }
+/* La fenêtre passe au-dessus de l'image proprement */
+body.insp-fullscreen .insp-pop.open { z-index: 20; }
+body.insp-fullscreen .insp-pop .piece-card { box-shadow: 0 12px 44px rgba(0,0,0,0.2); }
 
 /* ── Bottom sheet mobile ── */
 .insp-sheet { display: none; }
