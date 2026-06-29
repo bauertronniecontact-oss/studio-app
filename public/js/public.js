@@ -592,8 +592,8 @@
       const C = center();
       tape.style.width = (C * 2 + (N - 1) * SEG) + 'px';
       marks.forEach((m, i) => { m.style.left = (C + i * SEG) + 'px'; });
-      // graduations ancrées en bas, calées sur le 1er numéro (à C)
-      tape.style.backgroundPosition = `${C}px bottom, ${C}px bottom`;
+      // graduations calées sur le 1er numéro (à C)
+      tape.style.backgroundPositionX = C + 'px';
       update();
     }
     function update() {
