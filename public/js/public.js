@@ -596,20 +596,34 @@
         ${totalLabel}
       </div>
       <div class="insp-stage">
-        <svg class="insp-svg" preserveAspectRatio="none"></svg>
-        <div class="insp-figure ${ins.main_image ? '' : 'placeholder'}">
-          ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom onerror="this.remove();this.parentElement.classList.add('placeholder');">` : ''}
-          ${ins.main_image ? '' : '<span class="insp-empty-label">— image du look indisponible —</span>'}
-          ${ins.pieces.map((p, i) => `
-            <div class="anchor-dot" data-piece="${p.id}"
-              style="left:${p.anchor_x}%; top:${p.anchor_y}%;"
-              title="${esc(p.label||'')}">${i + 1}</div>
-          `).join('')}
+        <div class="insp-index">
+          <div class="ix-title">Les pièces<span>${ins.pieces.length}</span></div>
+          ${ins.pieces.map((p, i) => {
+            const r0 = (p.refs && p.refs[0]) || null;
+            return `<button class="ix-item" data-piece="${p.id}">
+              <span class="ix-num">${i + 1}</span>
+              <span class="ix-text">
+                <span class="ix-label">${esc(p.label || 'Pièce')}</span>
+                ${r0 && r0.brand ? `<span class="ix-brand">${esc(r0.brand)}</span>` : ''}
+              </span>
+            </button>`;
+          }).join('') || '<div class="ix-empty">À venir</div>'}
         </div>
-        <div class="insp-pop-layer">
-          ${ins.pieces.map(p => `<div class="insp-pop" data-piece="${p.id}" data-side="${(p.anchor_x ?? 50) < 50 ? 'left' : 'right'}">${renderPieceCard(p, pieceIndex.get(p.id))}</div>`).join('')}
+        <div class="insp-canvas">
+          <svg class="insp-svg" preserveAspectRatio="none"></svg>
+          <div class="insp-figure ${ins.main_image ? '' : 'placeholder'}">
+            ${ins.main_image ? `<img src="${esc(ins.main_image)}" alt="" data-zoom onerror="this.remove();this.parentElement.classList.add('placeholder');">` : ''}
+            ${ins.main_image ? '' : '<span class="insp-empty-label">— image du look indisponible —</span>'}
+            ${ins.pieces.map((p, i) => `
+              <div class="anchor-dot" data-piece="${p.id}"
+                style="left:${p.anchor_x}%; top:${p.anchor_y}%;"
+                title="${esc(p.label||'')}">${i + 1}</div>
+            `).join('')}
+          </div>
+          <div class="insp-pop-layer">
+            ${ins.pieces.map(p => `<div class="insp-pop" data-piece="${p.id}" data-side="right">${renderPieceCard(p, pieceIndex.get(p.id))}</div>`).join('')}
+          </div>
         </div>
-        ${ins.pieces.length ? `<div class="insp-hint">Cliquez un repère pour voir la pièce</div>` : ''}
       </div>
       <div class="insp-sheet" aria-hidden="true">
         <div class="insp-sheet-inner"></div>
@@ -642,9 +656,20 @@
         else togglePopover(wrap, id);
       });
     });
+    // Index latéral : clic ouvre la fenêtre (desktop) ou la sheet (mobile)
+    wrap.querySelectorAll('.ix-item').forEach(btn => {
+      const id = btn.dataset.piece;
+      btn.addEventListener('mouseenter', () => { if (!isMobile() && !wrap.querySelector('.insp-pop.open')) highlight(wrap, id, true); });
+      btn.addEventListener('mouseleave', () => { if (!isMobile() && !wrap.querySelector('.insp-pop.open')) highlight(wrap, id, false); });
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (isMobile()) openSheet(wrap, id);
+        else togglePopover(wrap, id);
+      });
+    });
     // Fermer les fenêtres en cliquant ailleurs
     wrap.addEventListener('click', e => {
-      if (!e.target.closest('.insp-pop') && !e.target.closest('.anchor-dot')) closePopovers(wrap);
+      if (!e.target.closest('.insp-pop') && !e.target.closest('.anchor-dot') && !e.target.closest('.ix-item')) closePopovers(wrap);
     });
     bindCardControls(wrap);
     return wrap;
@@ -665,35 +690,33 @@
     const svg = wrap.querySelector('.insp-svg'); if (svg) svg.innerHTML = '';
   }
   function positionPopover(wrap, pop) {
-    const stage = wrap.querySelector('.insp-stage');
-    const fig   = wrap.querySelector('.insp-figure');
-    const dot   = wrap.querySelector(`.anchor-dot[data-piece="${pop.dataset.piece}"]`);
-    if (!stage || !fig || !dot) return;
-    const sr = stage.getBoundingClientRect();
+    const canvas = wrap.querySelector('.insp-canvas');
+    const fig    = wrap.querySelector('.insp-figure');
+    const dot    = wrap.querySelector(`.anchor-dot[data-piece="${pop.dataset.piece}"]`);
+    if (!canvas || !fig || !dot) return;
+    const sr = canvas.getBoundingClientRect();
     const fr = fig.getBoundingClientRect();
-    const side = pop.dataset.side;
-    const gap = 36;
+    const gap = 32;
     const popW = pop.offsetWidth || 280;
-    let x = side === 'left' ? (fr.left - sr.left - gap - popW) : (fr.right - sr.left + gap);
-    // si pas la place du côté choisi, basculer
-    if (side === 'left' && x < 0) x = fr.right - sr.left + gap;
-    if (side === 'right' && x + popW > sr.width) x = fr.left - sr.left - gap - popW;
+    // Ouvre à droite de l'image; bascule à gauche si pas la place
+    let x = (fr.right - sr.left) + gap;
+    if (x + popW > sr.width) x = (fr.left - sr.left) - gap - popW;
     x = Math.max(0, Math.min(x, sr.width - popW));
     const dotY = (fr.top - sr.top) + (parseFloat(dot.style.top) / 100) * fr.height;
     let y = dotY - 40;
     const popH = pop.offsetHeight || 320;
-    y = Math.max(0, Math.min(y, sr.height - popH));
+    y = Math.max(0, Math.min(y, Math.max(0, sr.height - popH)));
     pop.style.left = x + 'px';
     pop.style.top  = y + 'px';
   }
   function drawConnector(wrap, pieceId) {
-    const stage = wrap.querySelector('.insp-stage');
-    const fig   = wrap.querySelector('.insp-figure');
-    const svg   = wrap.querySelector('.insp-svg');
-    const dot   = wrap.querySelector(`.anchor-dot[data-piece="${pieceId}"]`);
-    const pop   = wrap.querySelector(`.insp-pop[data-piece="${pieceId}"]`);
-    if (!stage || !fig || !svg || !dot || !pop) return;
-    const sr = stage.getBoundingClientRect();
+    const canvas = wrap.querySelector('.insp-canvas');
+    const fig    = wrap.querySelector('.insp-figure');
+    const svg    = wrap.querySelector('.insp-svg');
+    const dot    = wrap.querySelector(`.anchor-dot[data-piece="${pieceId}"]`);
+    const pop    = wrap.querySelector(`.insp-pop[data-piece="${pieceId}"]`);
+    if (!canvas || !fig || !svg || !dot || !pop) return;
+    const sr = canvas.getBoundingClientRect();
     const fr = fig.getBoundingClientRect();
     const pr = pop.getBoundingClientRect();
     svg.setAttribute('viewBox', `0 0 ${sr.width} ${sr.height}`);
@@ -802,6 +825,7 @@
   function highlight(wrap, pieceId, on) {
     wrap.querySelectorAll(`.piece-card[data-piece="${pieceId}"]`).forEach(b => b.classList.toggle('active', on));
     wrap.querySelectorAll(`.anchor-dot[data-piece="${pieceId}"]`).forEach(d => d.classList.toggle('active', on));
+    wrap.querySelectorAll(`.ix-item[data-piece="${pieceId}"]`).forEach(b => b.classList.toggle('active', on));
     wrap.querySelectorAll(`line[data-piece="${pieceId}"]`).forEach(l => l.classList.toggle('active', on));
   }
 
