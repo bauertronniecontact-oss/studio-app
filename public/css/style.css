@@ -697,6 +697,25 @@ input, textarea, select { font: inherit; }
 }
 .pc-nav button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* ── Carrousel horizontal des looks ── */
+.insp-carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  gap: 0;
+  scrollbar-width: none;        /* Firefox */
+}
+.insp-carousel::-webkit-scrollbar { display: none; }   /* WebKit */
+.insp-carousel .inspiration {
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: start;
+  margin: 0;
+  padding-bottom: 70px;          /* place pour le mètre en bas */
+}
+
 /* ── Indicateur de défilement (looks) ── */
 .insp-meter {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
@@ -727,7 +746,14 @@ input, textarea, select { font: inherit; }
   color: var(--muted); border-left: 1px solid var(--hairline); padding-left: 14px;
 }
 .insp-meter .im-label strong { color: var(--ink); font-weight: 600; }
-@media (max-width: 820px) { .insp-meter { bottom: 14px; padding: 7px 14px; } }
+.insp-meter .im-arrow {
+  width: 26px; height: 26px; flex-shrink: 0;
+  background: none; border: 1px solid var(--hairline-strong); color: var(--ink);
+  display: grid; place-items: center; font-size: 15px; line-height: 0; cursor: pointer;
+  border-radius: 50%; transition: background .15s, color .15s, border-color .15s;
+}
+.insp-meter .im-arrow:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+@media (max-width: 820px) { .insp-meter { bottom: 14px; padding: 6px 10px; gap: 10px; } .insp-meter .im-label { padding-left: 10px; } }
 
 /* ── Bottom sheet mobile ── */
 .insp-sheet { display: none; }

@@ -559,43 +559,53 @@
   function setupScrollMeter(insps) {
     if (insps.length < 2) return;
     const section = document.getElementById('tab-inspiration');
-    const articles = [...document.querySelectorAll('.inspiration')];
+    const track = document.getElementById('insp-list');
+    track.classList.add('insp-carousel');
+    const articles = [...track.querySelectorAll('.inspiration')];
     const meter = document.createElement('div');
     meter.className = 'insp-meter';
     meter.innerHTML = `
+      <button class="im-arrow im-prev" aria-label="Look précédent">‹</button>
       <div class="im-fill"></div>
       <div class="im-dots">
         ${insps.map((ins, i) => `<button class="im-dot" data-i="${i}" title="${esc(ins.title || ('Look ' + (i+1)))}"><span></span></button>`).join('')}
       </div>
       <div class="im-label"><strong>1</strong> / ${insps.length}</div>
+      <button class="im-arrow im-next" aria-label="Look suivant">›</button>
     `;
     section.appendChild(meter);
     const dots = [...meter.querySelectorAll('.im-dot')];
     const fill = meter.querySelector('.im-fill');
     const label = meter.querySelector('.im-label strong');
     let active = 0;
+    const goTo = i => {
+      i = Math.max(0, Math.min(i, articles.length - 1));
+      track.scrollTo({ left: articles[i].offsetLeft - track.offsetLeft, behavior: 'smooth' });
+    };
     const setActive = i => {
-      if (i === active) return;
       active = i;
       dots.forEach((d, k) => d.classList.toggle('on', k === i));
       label.textContent = i + 1;
     };
-    dots.forEach(d => d.addEventListener('click', () => {
-      articles[+d.dataset.i]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }));
+    dots.forEach(d => d.addEventListener('click', () => goTo(+d.dataset.i)));
+    meter.querySelector('.im-prev').addEventListener('click', () => goTo(active - 1));
+    meter.querySelector('.im-next').addEventListener('click', () => goTo(active + 1));
     const io = new IntersectionObserver(entries => {
       entries.forEach(e => { if (e.isIntersecting) setActive(articles.indexOf(e.target)); });
-    }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+    }, { root: track, rootMargin: '0px -45% 0px -45%', threshold: 0 });
     articles.forEach(a => io.observe(a));
-    // barre de progression globale
     const onScroll = () => {
-      const sc = document.documentElement;
-      const max = sc.scrollHeight - sc.clientHeight;
-      fill.style.width = max > 0 ? `${Math.min(100, (sc.scrollTop / max) * 100)}%` : '0%';
+      const max = track.scrollWidth - track.clientWidth;
+      fill.style.width = max > 0 ? `${Math.min(100, (track.scrollLeft / max) * 100)}%` : '0%';
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
+    track.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-    dots[0].classList.add('on');
+    setActive(0);
+    // Flèches clavier
+    section.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') goTo(active + 1);
+      if (e.key === 'ArrowLeft')  goTo(active - 1);
+    });
   }
 
   async function loadFashionNews() {
