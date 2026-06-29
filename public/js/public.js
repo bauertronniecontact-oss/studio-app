@@ -641,6 +641,8 @@
 
     track.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', layout);
+    // Régénère les graduations dès que la largeur du ruban change (plein écran, etc.)
+    if (window.ResizeObserver) { new ResizeObserver(() => layout()).observe(win); }
     section.addEventListener('keydown', e => {
       if (e.key === 'ArrowRight') goTo(active + 1);
       if (e.key === 'ArrowLeft')  goTo(active - 1);
