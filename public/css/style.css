@@ -504,10 +504,9 @@ input, textarea, select { font: inherit; }
 .inspiration h3 em { font-style: italic; }
 
 .insp-layout {
-  display: grid; grid-template-columns: 0.95fr 1fr;
+  display: grid; grid-template-columns: minmax(0, 460px) 1fr;
   gap: 32px; align-items: start;
 }
-.insp-left { max-width: 460px; justify-self: start; }
 @media (max-width: 820px) {
   .insp-layout { grid-template-columns: 1fr; }
   .insp-svg { display: none; }
