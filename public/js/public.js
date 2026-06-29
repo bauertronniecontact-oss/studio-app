@@ -564,53 +564,54 @@
     track.classList.add('insp-carousel');
     const articles = [...track.querySelectorAll('.inspiration')];
     const N = insps.length;
-    const SEG = 130; // espacement entre looks sur le ruban (px)
+    const PAD = 28; // marge gauche/droite pour le 1er et dernier numéro
 
     const ruler = document.createElement('div');
     ruler.className = 'insp-ruler';
     ruler.innerHTML = `
       <button class="ruler-arrow ruler-prev" aria-label="Look précédent">‹</button>
       <div class="ruler-window">
-        <div class="ruler-tape">
-          ${insps.map((ins, i) => `
-            <button class="ruler-mark" data-i="${i}" title="${esc(ins.title || ('Look ' + (i+1)))}">
-              <span class="rm-tick"></span><span class="rm-num">${i + 1}</span>
-            </button>`).join('')}
-        </div>
+        <div class="ruler-ticks"></div>
+        <div class="ruler-progress"></div>
+        ${insps.map((ins, i) => `
+          <button class="ruler-mark" data-i="${i}" title="${esc(ins.title || ('Look ' + (i+1)))}">
+            <span class="rm-num">${i + 1}</span><span class="rm-tick"></span>
+          </button>`).join('')}
       </div>
       <button class="ruler-arrow ruler-next" aria-label="Look suivant">›</button>
-      <div class="ruler-needle"></div>
     `;
     section.appendChild(ruler);
-    const win   = ruler.querySelector('.ruler-window');
-    const tape  = ruler.querySelector('.ruler-tape');
-    const marks = [...ruler.querySelectorAll('.ruler-mark')];
-    let active = 0;
+    const win      = ruler.querySelector('.ruler-window');
+    const ticksEl  = ruler.querySelector('.ruler-ticks');
+    const progress = ruler.querySelector('.ruler-progress');
+    const marks    = [...ruler.querySelectorAll('.ruler-mark')];
+    let active = -1;
 
-    function center() { return win.clientWidth / 2; }
+    const markX = (i, W) => PAD + i * (W - 2 * PAD) / (N - 1);
     function layout() {
-      const C = center();
-      tape.style.width = (C * 2 + (N - 1) * SEG) + 'px';
-      marks.forEach((m, i) => { m.style.left = (C + i * SEG) + 'px'; });
-      // graduations : vrais traits sur toute la longueur, majeurs tous les 5
-      const W = C * 2 + (N - 1) * SEG;
-      tape.querySelectorAll('.r-tick').forEach(t => t.remove());
-      const frag = document.createDocumentFragment();
+      const W = win.clientWidth;
+      if (W <= 0) return;
+      marks.forEach((m, i) => { m.style.left = markX(i, W) + 'px'; });
+      // graduations sur toute la largeur (de gauche à droite)
+      ticksEl.innerHTML = '';
       const STEP = 9;
-      for (let x = C % STEP; x <= W; x += STEP) {
+      const frag = document.createDocumentFragment();
+      for (let x = 0; x <= W; x += STEP) {
         const t = document.createElement('span');
         t.className = 'r-tick';
-        if (Math.round((x - C) / STEP) % 5 === 0) t.classList.add('major');
+        if (Math.round(x / STEP) % 5 === 0) t.classList.add('major');
         t.style.left = x + 'px';
         frag.appendChild(t);
       }
-      tape.appendChild(frag);
+      ticksEl.appendChild(frag);
       update();
     }
     function update() {
+      const W = win.clientWidth;
       const max = track.scrollWidth - track.clientWidth;
       const p = max > 0 ? track.scrollLeft / max : 0;
-      tape.style.transform = `translateX(${-(p * (N - 1) * SEG)}px)`;
+      // barre dorée : de la gauche jusqu'à la position courante
+      progress.style.width = (markX(0, W) + p * (W - 2 * PAD)) + 'px';
       const idx = Math.round(p * (N - 1));
       if (idx !== active) { active = idx; marks.forEach((m, k) => m.classList.toggle('on', k === idx)); }
     }
@@ -624,15 +625,16 @@
 
     // Glisser le ruban pour défiler
     let dragging = false, startX = 0, startScroll = 0;
-    const maxScroll = () => track.scrollWidth - track.clientWidth;
     win.addEventListener('pointerdown', e => {
       dragging = true; startX = e.clientX; startScroll = track.scrollLeft;
       win.setPointerCapture?.(e.pointerId); win.classList.add('dragging');
     });
     win.addEventListener('pointermove', e => {
       if (!dragging) return;
+      const W = win.clientWidth;
+      const max = track.scrollWidth - track.clientWidth;
       const dx = e.clientX - startX;
-      const ratio = maxScroll() / ((N - 1) * SEG || 1);
+      const ratio = max / (W - 2 * PAD || 1);
       track.scrollLeft = startScroll - dx * ratio;
     });
     const endDrag = () => { dragging = false; win.classList.remove('dragging'); };
@@ -641,7 +643,6 @@
 
     track.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', layout);
-    // Régénère les graduations dès que la largeur du ruban change (plein écran, etc.)
     if (window.ResizeObserver) { new ResizeObserver(() => layout()).observe(win); }
     section.addEventListener('keydown', e => {
       if (e.key === 'ArrowRight') goTo(active + 1);
