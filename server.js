@@ -1929,7 +1929,13 @@ app.post('/api/tryon', requireAuth, ah(async (req, res) => {
 /*           STATIC + PAGE ROUTES              */
 /* ═══════════════════════════════════════════ */
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/admin', ah(async (req, res) => {
+  // Admin (hors mode gestion) → dashboard plateforme, sans flash de l'ancienne page
+  if (req.session.userId && !req.session.adminId && await getIsAdmin(req.session.userId)) {
+    return res.redirect('/admin/platform');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+}));
 app.get('/admin/platform', (req, res) => res.sendFile(path.join(__dirname, 'public', 'platform.html')));
 app.get('/admin/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/admin/templates', (req, res) => res.sendFile(path.join(__dirname, 'public', 'templates.html')));

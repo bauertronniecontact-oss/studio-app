@@ -353,7 +353,8 @@ const I = {
       </div>`).join('');
   }
 
-  render();
+  try { render(); }
+  catch (e) { root.innerHTML = '<div class="ad-loading">Erreur d\'affichage : ' + esc(e && e.message || e) + '</div>'; console.error(e); }
 })();
 </script>
 </body>

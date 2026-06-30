@@ -184,7 +184,6 @@
   try { me = await api('/api/me'); }
   catch { location.href = '/login'; return; }
   applyWhiteLabel(me);
-  if (me.is_admin && !me.impersonating) { location.href = '/admin/platform'; return; }
   if (me.impersonating) {
     const b = document.createElement('div');
     b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accent);color:#fff;font-family:Inter,sans-serif;font-size:13px;padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:14px;';
