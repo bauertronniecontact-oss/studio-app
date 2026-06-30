@@ -43,6 +43,8 @@
   .stat .n { font-size: 30px; line-height: 1; font-weight: 500; }
   .stat .l { font-size: 11px; color: #999; margin-top: 8px; }
   .stat.dark .l { color: rgba(255,255,255,.65); }
+  .stat.clk { cursor: pointer; transition: transform .12s, box-shadow .15s; }
+  .stat.clk:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.07); }
 
   .nav a svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 
@@ -114,7 +116,7 @@ var IC = {
 
 (function(){
   var root = document.getElementById('root');
-  var DATA = null, ME = null, qs = '', qc = '', view = 'dash';
+  var DATA = null, ME = null, qs = '', qc = '', view = 'dash', dashSel = 'shop';
 
   fetch('/api/me').then(function(r){ return r.ok ? r.json() : null; }).then(function(me){
     if (!me) { location.href = '/login'; return; }
@@ -204,21 +206,49 @@ var IC = {
       '<table><thead><tr><th>Nom</th><th>Email</th><th>Styliste</th><th>Code</th><th>Statut</th><th></th></tr></thead><tbody id="cliBody">'+cliRows()+'</tbody></table></div>';
     if (view === 'rev') return head('Avis', (DATA.reviews||[]).length+' avis') + '<div class="card">'+reviewRows()+'</div>';
     if (view === 'act') return head('Activité récente', 'Derniers comptes créés') + '<div class="card">'+activityRows()+'</div>';
-    // dashboard
-    function sc(icon, n, l, dark){ return '<div class="stat'+(dark?' dark':'')+'"><div class="ic">'+svg(icon)+'</div><div class="n serif">'+n+'</div><div class="l">'+l+'</div></div>'; }
-    return head('Tableau de bord', 'Vue d\'ensemble de la plateforme') +
+    // dashboard — cartes cliquables (sélecteur) : la carte noire pilote le tableau du bas
+    function sc(icon, n, l, sel){ var on = sel && dashSel===sel; return '<div class="stat'+(on?' dark':'')+(sel?' clk':'')+'"'+(sel?' data-sel="'+sel+'"':'')+'><div class="ic">'+svg(icon)+'</div><div class="n serif">'+n+'</div><div class="l">'+l+'</div></div>'; }
+    return head('Tableau de bord', 'Vue d\'ensemble — cliquez une carte pour voir le détail') +
       '<div class="stats">' +
-        sc(IC.shop, st.shoppers, 'Stylistes') +
-        sc(IC.check, st.public_shoppers, 'Publics') +
-        sc(IC.cli, st.clients, 'Clients', true) +
-        sc(IC.check, st.claimed_clients, 'Clients actifs') +
+        sc(IC.shop, st.shoppers, 'Stylistes', 'shop') +
+        sc(IC.check, st.public_shoppers, 'Publics', 'shopPub') +
+        sc(IC.cli, st.clients, 'Clients', 'cli') +
+        sc(IC.check, st.claimed_clients, 'Clients actifs', 'cliAct') +
         sc(IC.bag, st.items, 'Pièces') +
-        sc(IC.rev, st.ratings, 'Avis') +
+        sc(IC.rev, st.ratings, 'Avis', 'rev') +
       '</div>' +
       '<div class="grid2">' +
         '<div class="card"><div class="ch"><h2 class="serif">Croissance</h2><div class="cs">Nouveaux comptes / mois</div></div>'+chartHtml()+'</div>' +
         '<div class="card pend"><div class="ch"><h2 class="serif">À valider</h2><div class="cs">Clients en attente</div></div>'+pendingHtml()+'</div>' +
-      '</div>';
+      '</div>' +
+      '<div class="card">'+dashTable()+'</div>';
+  }
+
+  function dashTable(){
+    var sel = dashSel;
+    if (sel === 'rev') {
+      return '<div class="ch"><h2 class="serif">Avis</h2><div class="cs">'+(DATA.reviews||[]).length+'</div></div>' + reviewRows();
+    }
+    if (sel === 'shop' || sel === 'shopPub') {
+      var list = DATA.shoppers.filter(function(s){ return sel==='shopPub' ? s.is_public : true; });
+      var title = sel==='shopPub' ? 'Stylistes publics' : 'Tous les stylistes';
+      var body = list.length ? list.map(function(s){
+        var st = '<span class="pill '+(s.is_public?'green':'')+'">'+(s.is_public?'Public':'Privé')+'</span>'+(s.suspended?' <span class="pill red">Susp.</span>':'');
+        return '<tr><td><span class="nm">'+esc(s.studio_name||s.name||'—')+'</span></td><td class="em">'+esc(s.email||'—')+'</td><td>'+esc(s.public_city||'—')+'</td><td>'+s.clients_count+'</td><td>'+st+'</td>'+
+          '<td><div class="acts">'+(s.is_admin?'':'<button class="b k" data-a="manage" data-id="'+s.id+'">Gérer</button>')+'<button class="b" data-a="goShop">Voir tout →</button></div></td></tr>';
+      }).join('') : '<tr><td colspan="6" class="empty">Aucun.</td></tr>';
+      return '<div class="ch"><h2 class="serif">'+title+'</h2><div class="cs">'+list.length+'</div></div>'+
+        '<table><thead><tr><th>Studio</th><th>Email</th><th>Ville</th><th>Clients</th><th>Statut</th><th></th></tr></thead><tbody>'+body+'</tbody></table>';
+    }
+    // clients (par défaut) / clients actifs
+    var cl = DATA.clients.filter(function(c){ return sel==='cliAct' ? c.claimed : true; });
+    var t2 = sel==='cliAct' ? 'Clients actifs' : 'Tous les clients';
+    var b2 = cl.length ? cl.map(function(c){
+      return '<tr><td><span class="nm">'+esc(c.name||'—')+'</span></td><td class="em">'+esc(c.email||'—')+'</td><td>'+esc(c.shopper_name)+'</td><td><span class="pill '+(c.claimed?'green':'')+'">'+(c.claimed?'Actif':'En attente')+'</span></td>'+
+        '<td><div class="acts"><a class="b" href="/c/'+esc(c.slug)+'?code='+esc(c.access_code||'')+'" target="_blank">Espace</a><button class="b" data-a="goCli">Voir tout →</button></div></td></tr>';
+    }).join('') : '<tr><td colspan="5" class="empty">Aucun.</td></tr>';
+    return '<div class="ch"><h2 class="serif">'+t2+'</h2><div class="cs">'+cl.length+'</div></div>'+
+      '<table><thead><tr><th>Nom</th><th>Email</th><th>Styliste</th><th>Statut</th><th></th></tr></thead><tbody>'+b2+'</tbody></table>';
   }
 
   function chartHtml(){
@@ -244,12 +274,16 @@ var IC = {
   document.addEventListener('click', function(e){
     var nv = e.target.closest('[data-view]');
     if (nv) { e.preventDefault(); view = nv.dataset.view; draw(); window.scrollTo(0,0); return; }
+    var sel = e.target.closest('[data-sel]');
+    if (sel) { dashSel = sel.dataset.sel; draw(); return; }
     var el = e.target.closest('[data-a]'); if (!el) return;
     var a = el.dataset.a, id = el.dataset.id;
     var s = id && DATA ? DATA.shoppers.find(function(x){return x.id==id;}) : null;
     var c = id && DATA ? DATA.clients.find(function(x){return x.id==id;}) : null;
     if (a==='expShop') { exportCsv('stylistes', ['Studio','Nom','Email','Ville','Clients','Note','Public','Suspendu'], DATA.shoppers.map(function(s){ return [s.studio_name,s.name,s.email,s.public_city,s.clients_count,s.rating_count?s.rating_avg.toFixed(1):'',s.is_public?'oui':'non',s.suspended?'oui':'non']; })); return; }
     if (a==='expCli') { exportCsv('clients', ['Nom','Email','Styliste','Code','Actif','Suspendu'], DATA.clients.map(function(c){ return [c.name,c.email,c.shopper_name,c.access_code,c.claimed?'oui':'non',c.suspended?'oui':'non']; })); return; }
+    if (a==='goShop') { view='shop'; draw(); window.scrollTo(0,0); return; }
+    if (a==='goCli') { view='cli'; draw(); window.scrollTo(0,0); return; }
     if (a==='logout') { fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login'; }); }
     else if (a==='manage') { fetch('/api/admin/impersonate/'+id,{method:'POST'}).then(function(r){ if(r.ok) location.href='/admin'; else alert('Erreur'); }); }
     else if (a==='pub') { fetch('/api/admin/shopper/'+id+'/public',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_public:!s.is_public})}).then(function(r){ if(r.ok){ s.is_public=!s.is_public; refreshShop(); } }); }
