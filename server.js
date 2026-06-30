@@ -153,8 +153,7 @@ const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(e
 
 const requireAdmin = ah(async (req, res, next) => {
   if (!req.session.userId) return res.status(401).json({ error: 'unauthorized' });
-  const u = await dbFirst('users', { id: req.session.userId }, { select: 'id, is_admin' });
-  if (!u || !u.is_admin) return res.status(403).json({ error: 'admin requis' });
+  if (!(await getIsAdmin(req.session.userId))) return res.status(403).json({ error: 'admin requis' });
   next();
 });
 
@@ -274,10 +273,17 @@ app.post('/api/auth/signup', ah(async (req, res) => {
 }));
 app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 
-const USER_PUBLIC_SELECT = 'id, email, name, studio_name, studio_logo, accent_color, photo_url, bio, portfolio, specialties, years_experience, is_public, public_slug, public_tagline, public_city, is_admin';
+const USER_PUBLIC_SELECT = 'id, email, name, studio_name, studio_logo, accent_color, photo_url, bio, portfolio, specialties, years_experience, is_public, public_slug, public_tagline, public_city';
+
+// Lecture défensive de is_admin (colonne ajoutée par migration 007 ; ne casse rien si absente)
+async function getIsAdmin(userId) {
+  try { const u = await dbFirst('users', { id: userId }, { select: 'is_admin' }); return !!u?.is_admin; }
+  catch { return false; }
+}
 
 app.get('/api/me', requireAuth, ah(async (req, res) => {
   const u = await dbFirst('users', { id: req.session.userId }, { select: USER_PUBLIC_SELECT });
+  if (u) u.is_admin = await getIsAdmin(req.session.userId);
   res.json(u);
 }));
 app.put('/api/me/settings', requireAuth, ah(async (req, res) => {
