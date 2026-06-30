@@ -82,7 +82,7 @@ var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{da
 
 (function(){
   var root = document.getElementById('root');
-  var DATA = null, ME = null, qs = '', qc = '';
+  var DATA = null, ME = null, qs = '', qc = '', view = 'dash';
 
   fetch('/api/me').then(function(r){ return r.ok ? r.json() : null; }).then(function(me){
     if (!me) { location.href = '/login'; return; }
@@ -143,47 +143,52 @@ var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{da
   }
 
   function draw(){
-    var st = DATA.stats;
     var initial = ((ME.name||ME.email||'A').charAt(0)||'A').toUpperCase();
+    var nav = [['dash','Tableau de bord'],['shop','Stylistes'],['cli','Clients'],['rev','Avis'],['act','Activité']]
+      .map(function(v){ return '<a data-view="'+v[0]+'" class="'+(view===v[0]?'on':'')+'">'+v[1]+'</a>'; }).join('');
     root.innerHTML =
       '<div class="shell">' +
         '<div class="side">' +
           '<div class="logo"><span class="lg">S</span><span class="serif">Admin</span></div>' +
-          '<div class="nav">' +
-            '<a class="on" href="#">Tableau de bord</a>' +
-            '<a href="#sec-shop">Stylistes</a>' +
-            '<a href="#sec-cli">Clients</a>' +
-            '<a href="#sec-rev">Avis</a>' +
-            '<a href="#sec-act">Activité</a>' +
-          '</div>' +
+          '<div class="nav">'+nav+'</div>' +
           '<div class="prof"><div class="pp">'+initial+'</div><div><div class="pn">'+esc(ME.name||'Administrateur')+'</div><div class="pe">'+esc(ME.email||'')+'</div></div></div>' +
           '<button class="out" data-a="logout">Se déconnecter</button>' +
         '</div>' +
-        '<div class="main">' +
-          '<div class="h1 serif">Tableau de bord</div><div class="h1s">Vue d\'ensemble de la plateforme</div>' +
-          '<div class="stats">' +
-            '<div class="stat"><div class="n serif">'+st.shoppers+'</div><div class="l">Stylistes</div></div>' +
-            '<div class="stat"><div class="n serif">'+st.public_shoppers+'</div><div class="l">Publics</div></div>' +
-            '<div class="stat dark"><div class="n serif">'+st.clients+'</div><div class="l">Clients</div></div>' +
-            '<div class="stat"><div class="n serif">'+st.claimed_clients+'</div><div class="l">Clients actifs</div></div>' +
-            '<div class="stat"><div class="n serif">'+st.items+'</div><div class="l">Pièces</div></div>' +
-            '<div class="stat"><div class="n serif">'+st.ratings+'</div><div class="l">Avis</div></div>' +
-          '</div>' +
-          '<div class="card" id="sec-shop"><div class="ch"><div><h2 class="serif">Personal Shoppers</h2><div class="cs">'+DATA.shoppers.length+' comptes</div></div><input class="search" id="qs" placeholder="Rechercher…" value="'+esc(qs)+'"></div>' +
-            '<table><thead><tr><th>Studio</th><th>Email</th><th>Ville</th><th>Clients</th><th>Note</th><th>Statut</th><th></th></tr></thead><tbody>'+shopRows()+'</tbody></table></div>' +
-          '<div class="card" id="sec-cli"><div class="ch"><div><h2 class="serif">Clients</h2><div class="cs">'+DATA.clients.length+' comptes</div></div><input class="search" id="qc" placeholder="Rechercher…" value="'+esc(qc)+'"></div>' +
-            '<table><thead><tr><th>Nom</th><th>Email</th><th>Styliste</th><th>Code</th><th>Statut</th><th></th></tr></thead><tbody>'+cliRows()+'</tbody></table></div>' +
-          '<div class="card" id="sec-rev"><div class="ch"><div><h2 class="serif">Avis</h2><div class="cs">'+(DATA.reviews||[]).length+'</div></div></div>'+reviewRows()+'</div>' +
-          '<div class="card" id="sec-act"><div class="ch"><div><h2 class="serif">Activité récente</h2></div></div>'+activityRows()+'</div>' +
-        '</div>' +
+        '<div class="main">' + mainView() + '</div>' +
       '</div>';
 
-    var sEl = document.getElementById('qs'); if (sEl) sEl.oninput = function(e){ qs = e.target.value; var t = document.querySelector('#sec-shop tbody'); if (t) t.innerHTML = shopRows(); };
-    var cEl = document.getElementById('qc'); if (cEl) cEl.oninput = function(e){ qc = e.target.value; var t = document.querySelector('#sec-cli tbody'); if (t) t.innerHTML = cliRows(); };
+    var sEl = document.getElementById('qs'); if (sEl) sEl.oninput = function(e){ qs = e.target.value; var t = document.querySelector('#shopBody'); if (t) t.innerHTML = shopRows(); };
+    var cEl = document.getElementById('qc'); if (cEl) cEl.oninput = function(e){ qc = e.target.value; var t = document.querySelector('#cliBody'); if (t) t.innerHTML = cliRows(); };
+  }
+
+  function head(t, s){ return '<div class="h1 serif">'+t+'</div><div class="h1s">'+(s||'')+'</div>'; }
+  function mainView(){
+    var st = DATA.stats;
+    if (view === 'shop') return head('Personal Shoppers', DATA.shoppers.length+' comptes') +
+      '<div class="card"><div class="ch"><div class="cs">Rechercher</div><input class="search" id="qs" placeholder="Nom, email, studio…" value="'+esc(qs)+'"></div>' +
+      '<table><thead><tr><th>Studio</th><th>Email</th><th>Ville</th><th>Clients</th><th>Note</th><th>Statut</th><th></th></tr></thead><tbody id="shopBody">'+shopRows()+'</tbody></table></div>';
+    if (view === 'cli') return head('Clients', DATA.clients.length+' comptes') +
+      '<div class="card"><div class="ch"><div class="cs">Rechercher</div><input class="search" id="qc" placeholder="Nom, email, styliste…" value="'+esc(qc)+'"></div>' +
+      '<table><thead><tr><th>Nom</th><th>Email</th><th>Styliste</th><th>Code</th><th>Statut</th><th></th></tr></thead><tbody id="cliBody">'+cliRows()+'</tbody></table></div>';
+    if (view === 'rev') return head('Avis', (DATA.reviews||[]).length+' avis') + '<div class="card">'+reviewRows()+'</div>';
+    if (view === 'act') return head('Activité récente', 'Derniers comptes créés') + '<div class="card">'+activityRows()+'</div>';
+    // dashboard
+    return head('Tableau de bord', 'Vue d\'ensemble de la plateforme') +
+      '<div class="stats">' +
+        '<div class="stat"><div class="n serif">'+st.shoppers+'</div><div class="l">Stylistes</div></div>' +
+        '<div class="stat"><div class="n serif">'+st.public_shoppers+'</div><div class="l">Publics</div></div>' +
+        '<div class="stat"><div class="n serif">'+st.clients+'</div><div class="l">Clients</div></div>' +
+        '<div class="stat"><div class="n serif">'+st.claimed_clients+'</div><div class="l">Clients actifs</div></div>' +
+        '<div class="stat"><div class="n serif">'+st.items+'</div><div class="l">Pièces</div></div>' +
+        '<div class="stat"><div class="n serif">'+st.ratings+'</div><div class="l">Avis</div></div>' +
+      '</div>' +
+      '<div class="card"><div class="ch"><h2 class="serif">Activité récente</h2></div>'+activityRows()+'</div>';
   }
 
   // Délégation : un seul listener pour toutes les actions
   document.addEventListener('click', function(e){
+    var nv = e.target.closest('[data-view]');
+    if (nv) { e.preventDefault(); view = nv.dataset.view; draw(); window.scrollTo(0,0); return; }
     var el = e.target.closest('[data-a]'); if (!el) return;
     var a = el.dataset.a, id = el.dataset.id;
     var s = id && DATA ? DATA.shoppers.find(function(x){return x.id==id;}) : null;
@@ -198,10 +203,10 @@ var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{da
     else if (a==='magic') { fetch('/api/admin/client/'+id+'/magic-link',{method:'POST'}).then(function(r){return r.json();}).then(function(d){ if(d.magic_url) prompt('Lien d\'accès :', d.magic_url); else alert(d.error||'Erreur'); }); }
     else if (a==='suspC') { fetch('/api/admin/client/'+id+'/suspend',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({suspended:!c.suspended})}).then(function(r){ if(r.ok){ c.suspended=!c.suspended; refreshCli(); } }); }
     else if (a==='delC') { if(!confirm('Supprimer ce client ?')) return; fetch('/api/admin/client/'+id,{method:'DELETE'}).then(function(r){ if(r.ok){ DATA.clients=DATA.clients.filter(function(x){return x.id!=id;}); draw(); } }); }
-    else if (a==='delR') { if(!confirm('Supprimer cet avis ?')) return; fetch('/api/admin/rating/'+id,{method:'DELETE'}).then(function(r){ if(r.ok){ DATA.reviews=DATA.reviews.filter(function(x){return x.id!=id;}); var t=document.querySelector('#sec-rev'); if(t){ var hd=t.querySelector('.ch'); t.innerHTML=''; t.appendChild(hd); t.insertAdjacentHTML('beforeend', reviewRows()); } draw(); } }); }
+    else if (a==='delR') { if(!confirm('Supprimer cet avis ?')) return; fetch('/api/admin/rating/'+id,{method:'DELETE'}).then(function(r){ if(r.ok){ DATA.reviews=DATA.reviews.filter(function(x){return x.id!=id;}); draw(); } }); }
   });
-  function refreshShop(){ var t=document.querySelector('#sec-shop tbody'); if(t) t.innerHTML = shopRows(); }
-  function refreshCli(){ var t=document.querySelector('#sec-cli tbody'); if(t) t.innerHTML = cliRows(); }
+  function refreshShop(){ var t=document.getElementById('shopBody'); if(t) t.innerHTML = shopRows(); }
+  function refreshCli(){ var t=document.getElementById('cliBody'); if(t) t.innerHTML = cliRows(); }
 })();
 </script>
 </body>
