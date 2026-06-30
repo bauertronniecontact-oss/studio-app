@@ -146,6 +146,25 @@
 }
 .sh-portfolio .tile:hover img { transform: scale(1.04); }
 
+/* Avis clients */
+.sh-reviews { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 10px; }
+@media (max-width: 700px) { .sh-reviews { grid-template-columns: 1fr; } }
+.sh-review { background: var(--bg-soft); border: 1px solid var(--hairline); padding: 16px 18px; border-radius: 3px; }
+.sh-review .rv-stars { color: var(--accent); letter-spacing: 2px; font-size: 14px; margin-bottom: 8px; }
+.sh-review .rv-text { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+.sh-review .rv-author { font-family: 'Inter', sans-serif; font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-top: 10px; }
+
+/* Widget de notation */
+.rate-widget { background: rgba(184,145,90,0.06); border: 1px solid rgba(184,145,90,0.25); padding: 18px; border-radius: 4px; margin-bottom: 22px; }
+.rate-widget .rw-label { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 15px; color: var(--ink-soft); margin-bottom: 10px; }
+.rate-widget .rw-stars { display: flex; gap: 4px; margin-bottom: 12px; }
+.rate-widget .rw-star { background: none; border: none; font-size: 30px; line-height: 1; cursor: pointer; color: var(--hairline-strong); transition: color .15s, transform .1s; padding: 0; }
+.rate-widget .rw-star:hover { transform: scale(1.12); }
+.rate-widget .rw-star.on { color: var(--accent); }
+.rate-widget .rw-text { width: 100%; box-sizing: border-box; border: 1px solid var(--hairline-strong); padding: 10px 12px; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 14px; resize: vertical; margin-bottom: 12px; }
+.rate-widget .rw-submit { font-size: 12px; }
+.rate-widget .rw-msg { font-size: 12px; margin-top: 10px; font-family: 'Inter', sans-serif; }
+
 .sh-cta-section {
   background: var(--bg-soft);
   padding: 60px 0;
@@ -199,6 +218,7 @@
 
 <script>
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const starsHtml = (avg) => { const f = Math.round(avg||0); let o=''; for(let i=1;i<=5;i++) o+=`<span style="color:${i<=f?'var(--accent)':'var(--hairline-strong)'};">★</span>`; return o; };
 
 (async function(){
   const slug = location.pathname.split('/').filter(Boolean)[1];
@@ -234,6 +254,7 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
             <div class="sh-title">${esc((s.studio_name || s.name || 'Studio').toUpperCase())}</div>
             ${s.name ? `<div class="sh-name">— ${esc(s.name)}</div>` : ''}
             ${s.public_tagline ? `<div class="sh-tagline">"${esc(s.public_tagline)}"</div>` : ''}
+            ${s.rating_count ? `<div class="sh-rating-sum" style="margin-top:10px;font-size:16px;letter-spacing:2px;">${starsHtml(s.rating_avg)} <span style="font-size:13px;color:var(--muted);letter-spacing:normal;font-family:'Inter',sans-serif;">${s.rating_avg.toFixed(1)} sur 5 · ${s.rating_count} avis</span></div>` : ''}
             ${specs.length ? `<div class="sh-tags">${specs.map(t => `<span class="sh-tag">${esc(t)}</span>`).join('')}</div>` : ''}
           </div>
         </div>
@@ -251,6 +272,22 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
             <div class="sh-portfolio">
               ${portfolio.map(u => `<div class="tile"><img src="${esc(u)}" alt="" onerror="this.parentElement.remove();"></div>`).join('')}
             </div>
+          </div>` : ''}
+
+        ${(s.reviews && s.reviews.length) || s.can_rate ? `
+          <div class="sh-section">
+            <div class="lbl">Avis</div>
+            <h2>Ce qu'en disent les <em>clients</em></h2>
+            ${s.can_rate ? '<div id="rateZone"></div>' : ''}
+            ${(s.reviews && s.reviews.length) ? `
+              <div class="sh-reviews">
+                ${s.reviews.map(r => `
+                  <div class="sh-review">
+                    <div class="rv-stars">${starsHtml(r.stars)}</div>
+                    <div class="rv-text">${esc(r.review)}</div>
+                    <div class="rv-author">— ${esc(r.author)}</div>
+                  </div>`).join('')}
+              </div>` : (s.can_rate ? '' : '<div style="font-family:Cormorant Garamond,serif;font-style:italic;color:var(--muted);">Pas encore d\'avis.</div>')}
           </div>` : ''}
       </div>
     </section>
@@ -286,7 +323,36 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
     </section>
   `;
 
-  document.getElementById('reqForm').addEventListener('submit', async (e) => {
+  // Widget de notation (client connecté = client de ce styliste)
+  if (s.can_rate) {
+    const zone = document.getElementById('rateZone');
+    let picked = s.my_rating ? s.my_rating.stars : 0;
+    const renderRate = () => {
+      zone.innerHTML = `
+        <div class="rate-widget">
+          <div class="rw-label">${s.my_rating ? 'Modifier votre avis' : 'Vous avez travaillé ensemble ? Laissez votre avis'}</div>
+          <div class="rw-stars">${[1,2,3,4,5].map(i => `<button type="button" class="rw-star ${i<=picked?'on':''}" data-v="${i}">★</button>`).join('')}</div>
+          <textarea class="rw-text" rows="3" placeholder="Votre expérience avec ce styliste…">${esc(s.my_rating?.review || '')}</textarea>
+          <button class="btn rw-submit" type="button">${s.my_rating ? 'Mettre à jour' : 'Publier mon avis'}</button>
+          <div class="rw-msg" style="display:none;"></div>
+        </div>`;
+      zone.querySelectorAll('.rw-star').forEach(b => b.addEventListener('click', () => { picked = +b.dataset.v; renderRate(); }));
+      zone.querySelector('.rw-submit').addEventListener('click', async () => {
+        const msg = zone.querySelector('.rw-msg');
+        if (!picked) { msg.textContent = 'Choisissez une note.'; msg.style.color = '#b03030'; msg.style.display='block'; return; }
+        const review = zone.querySelector('.rw-text').value;
+        const r = await fetch(`/api/shoppers/${slug}/rate`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ stars: picked, review }) });
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) { msg.textContent = d.error || 'Erreur'; msg.style.color = '#b03030'; msg.style.display='block'; return; }
+        msg.textContent = '✓ Merci, votre avis est publié.'; msg.style.color = 'var(--accent)'; msg.style.display='block';
+        setTimeout(() => location.reload(), 900);
+      });
+    };
+    renderRate();
+  }
+
+  const reqForm = document.getElementById('reqForm');
+  if (reqForm) reqForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target).entries());
     const err = document.getElementById('err');

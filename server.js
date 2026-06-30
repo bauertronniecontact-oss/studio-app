@@ -1138,6 +1138,19 @@ app.get('/api/fashion-news', ah(async (req, res) => {
   res.json({ items: merged.length ? merged : fashionCache.items, cached: false });
 }));
 
+// Agrégation des notes pour une liste de shoppers → { [id]: { avg, count } }
+async function ratingsFor(shopperIds) {
+  const out = {};
+  if (!shopperIds.length) return out;
+  const { data } = await sb.from('shopper_ratings').select('shopper_id, stars').in('shopper_id', shopperIds);
+  (data || []).forEach(r => {
+    const o = out[r.shopper_id] || (out[r.shopper_id] = { sum: 0, count: 0 });
+    o.sum += r.stars; o.count++;
+  });
+  Object.keys(out).forEach(k => { out[k] = { avg: out[k].sum / out[k].count, count: out[k].count }; });
+  return out;
+}
+
 app.get('/api/discover', ah(async (req, res) => {
   const { data, error } = await sb.from('users')
     .select(SHOPPER_PUBLIC_FIELDS)
@@ -1145,13 +1158,59 @@ app.get('/api/discover', ah(async (req, res) => {
     .not('public_slug', 'is', null)
     .order('id', { ascending: false });
   if (error) throw error;
-  res.json(data || []);
+  const rows = data || [];
+  const ratings = await ratingsFor(rows.map(r => r.id));
+  rows.forEach(r => { const rt = ratings[r.id]; r.rating_avg = rt ? rt.avg : null; r.rating_count = rt ? rt.count : 0; });
+  res.json(rows);
 }));
 
 app.get('/api/shoppers/:slug', ah(async (req, res) => {
   const u = await dbFirst('users', { public_slug: req.params.slug, is_public: true }, { select: SHOPPER_PUBLIC_FIELDS });
   if (!u) return res.sendStatus(404);
+  const ratings = await ratingsFor([u.id]);
+  const rt = ratings[u.id];
+  u.rating_avg = rt ? rt.avg : null;
+  u.rating_count = rt ? rt.count : 0;
+  // avis récents (avec prénom du client)
+  const { data: reviews } = await sb.from('shopper_ratings')
+    .select('stars, review, created_at, client_id')
+    .eq('shopper_id', u.id).not('review', 'is', null).order('created_at', { ascending: false }).limit(10);
+  const cIds = [...new Set((reviews || []).map(r => r.client_id))];
+  const names = {};
+  if (cIds.length) { const { data: cs } = await sb.from('clients').select('id, name').in('id', cIds); (cs||[]).forEach(c => names[c.id] = c.name); }
+  u.reviews = (reviews || []).filter(r => (r.review || '').trim()).map(r => ({
+    stars: r.stars, review: r.review, created_at: r.created_at,
+    author: (names[r.client_id] || 'Client').split(' ')[0]
+  }));
+  // Le visiteur connecté (client) peut-il noter ce shopper ? (= il est client de ce shopper)
+  let canRate = false, myRating = null;
+  if (req.session?.clientId) {
+    const c = await dbFirst('clients', { id: req.session.clientId }, { select: 'id, user_id' });
+    if (c && c.user_id === u.id) {
+      canRate = true;
+      myRating = await dbFirst('shopper_ratings', { shopper_id: u.id, client_id: c.id }, { select: 'stars, review' });
+    }
+  }
+  u.can_rate = canRate;
+  u.my_rating = myRating || null;
   res.json(u);
+}));
+
+// Un client connecté note SON styliste
+app.post('/api/shoppers/:slug/rate', ah(async (req, res) => {
+  if (!req.session?.clientId) return res.status(401).json({ error: 'Connectez-vous pour noter.' });
+  const u = await dbFirst('users', { public_slug: req.params.slug, is_public: true }, { select: 'id' });
+  if (!u) return res.sendStatus(404);
+  const c = await dbFirst('clients', { id: req.session.clientId }, { select: 'id, user_id' });
+  if (!c || c.user_id !== u.id) return res.status(403).json({ error: 'Vous ne pouvez noter que votre styliste.' });
+  const stars = parseInt(req.body?.stars, 10);
+  if (!(stars >= 1 && stars <= 5)) return res.status(400).json({ error: 'Note entre 1 et 5.' });
+  const review = (req.body?.review || '').slice(0, 1000).trim() || null;
+  const now = new Date().toISOString();
+  const existing = await dbFirst('shopper_ratings', { shopper_id: u.id, client_id: c.id }, { select: 'id' });
+  if (existing) await dbUpdate('shopper_ratings', { id: existing.id }, { stars, review, updated_at: now });
+  else await dbInsert('shopper_ratings', { shopper_id: u.id, client_id: c.id, stars, review });
+  res.json({ ok: true });
 }));
 
 // Demande d'accès d'un nouveau client à un shopper

@@ -31,6 +31,8 @@
       </p>
     </div>
 
+    <div id="styleFilter" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:34px;"></div>
+
     <div id="grid" class="shoppers-grid">
       <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--muted);font-family:'Cormorant Garamond',serif;font-style:italic;">Chargement…</div>
     </div>
@@ -184,6 +186,13 @@
 <script>
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
+const stars = (avg) => {
+  const full = Math.round(avg || 0);
+  let out = '';
+  for (let i=1;i<=5;i++) out += `<span style="color:${i<=full?'var(--accent)':'var(--hairline-strong)'};">★</span>`;
+  return out;
+};
+
 (async function(){
   const grid = document.getElementById('grid');
   const shoppers = await fetch('/api/discover').then(r => r.json());
@@ -196,7 +205,23 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
     return;
   }
 
-  grid.innerHTML = shoppers.map(s => {
+  // Filtre par style (spécialités agrégées)
+  const allStyles = [...new Set(shoppers.flatMap(s => (s.specialties||'').split(',').map(x=>x.trim()).filter(Boolean)))].sort();
+  let activeStyle = null;
+  const fbar = document.getElementById('styleFilter');
+  const chip = (label, val) => `<button class="style-chip ${activeStyle===val?'on':''}" data-style="${val==null?'':esc(val)}">${esc(label)}</button>`;
+  function renderFilter(){
+    fbar.innerHTML = chip('Tous', null) + allStyles.map(st => chip(st, st)).join('');
+    fbar.querySelectorAll('[data-style]').forEach(b => b.addEventListener('click', () => {
+      activeStyle = b.dataset.style || null; renderFilter(); renderGrid();
+    }));
+  }
+
+  function renderGrid(){
+    const list = activeStyle
+      ? shoppers.filter(s => (s.specialties||'').toLowerCase().includes(activeStyle.toLowerCase()))
+      : shoppers;
+    grid.innerHTML = list.map(s => {
     const portfolio = Array.isArray(s.portfolio) ? s.portfolio.filter(Boolean).slice(0, 4) : [];
     const initial = ((s.studio_name || s.name || '?').trim().charAt(0) || 'S').toUpperCase();
     const specs = (s.specialties || '').split(',').map(x=>x.trim()).filter(Boolean);
@@ -215,6 +240,7 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
             <div class="sc-name-block">
               <div class="sc-studio">${esc((s.studio_name || 'Studio').toUpperCase())}</div>
               ${s.name ? `<div class="sc-name">${esc(s.name)}${s.public_city ? ' · ' + esc(s.public_city) : ''}</div>` : (s.public_city ? `<div class="sc-name">${esc(s.public_city)}</div>` : '')}
+              ${s.rating_count ? `<div class="sc-rating" style="font-size:12px;margin-top:3px;letter-spacing:1px;">${stars(s.rating_avg)} <span style="color:var(--muted);letter-spacing:normal;">${s.rating_avg.toFixed(1)} · ${s.rating_count} avis</span></div>` : `<div class="sc-rating" style="font-size:11px;margin-top:3px;color:var(--muted);font-style:italic;font-family:'Cormorant Garamond',serif;">Pas encore d'avis</div>`}
             </div>
           </div>
           ${s.public_tagline ? `<div class="sc-tagline">${esc(s.public_tagline)}</div>` : ''}
@@ -223,8 +249,22 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
           <div class="sc-cta">Découvrir →</div>
         </div>
       </a>`;
-  }).join('');
+    }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:50px;color:var(--muted);font-family:Cormorant Garamond,serif;font-style:italic;">Aucun styliste pour ce style.</div>';
+  }
+
+  renderFilter();
+  renderGrid();
 })();
 </script>
+<style>
+.style-chip {
+  font-family: 'Cormorant Garamond', serif; font-size: 14px;
+  background: #fff; color: var(--ink); border: 1px solid var(--hairline-strong);
+  padding: 7px 16px; border-radius: 18px; cursor: pointer;
+  transition: background .2s, color .2s, border-color .2s, transform .15s;
+}
+.style-chip:hover { background: var(--accent); color: #fff; border-color: var(--accent); transform: translateY(-1px); }
+.style-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+</style>
 </body>
 </html>
