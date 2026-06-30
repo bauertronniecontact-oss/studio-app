@@ -102,11 +102,62 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
             <th>Nom</th><th>Email</th><th>Styliste</th><th>Code d'accès</th><th>Statut</th><th></th>
           </tr></thead><tbody id="clientsBody"></tbody></table>
         </div>
+
+        <div class="pf-section">
+          <h2>Avis à modérer</h2>
+          <div class="h-sub">${(data.reviews||[]).length} avis publié${(data.reviews||[]).length>1?'s':''}</div>
+          <div id="reviewsBody"></div>
+        </div>
+
+        <div class="pf-section">
+          <h2>Activité récente</h2>
+          <div class="h-sub">Derniers comptes créés</div>
+          <div id="activityBody"></div>
+        </div>
       </div>`;
 
-    renderShoppers(''); renderClients('');
+    renderShoppers(''); renderClients(''); renderReviews(); renderActivity();
     document.getElementById('searchShoppers').addEventListener('input', e => renderShoppers(e.target.value));
     document.getElementById('searchClients').addEventListener('input', e => renderClients(e.target.value));
+  }
+
+  function fmtDate(d){ try { return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }); } catch { return ''; } }
+
+  function renderReviews(){
+    const el = document.getElementById('reviewsBody');
+    const rs = data.reviews || [];
+    if (!rs.length) { el.innerHTML = '<div class="pf-email" style="padding:10px 0;">Aucun avis pour le moment.</div>'; return; }
+    el.innerHTML = rs.map(r => `
+      <div data-rid="${r.id}" style="display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--hairline);">
+        <div style="color:var(--accent);letter-spacing:1px;font-size:13px;white-space:nowrap;">${stars(r.stars)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink-soft);">"${esc(r.review)}"</div>
+          <div class="pf-email" style="margin-top:3px;">${esc(r.client_name)} → ${esc(r.shopper_name)} · ${fmtDate(r.created_at)}</div>
+        </div>
+        <button class="pf-btn danger" data-act="delReview">Supprimer</button>
+      </div>`).join('');
+    el.querySelectorAll('[data-rid]').forEach(row => {
+      row.querySelector('[data-act=delReview]').addEventListener('click', async () => {
+        if (!confirm('Supprimer cet avis ?')) return;
+        const r = await fetch(`/api/admin/rating/${row.dataset.rid}`, { method:'DELETE' });
+        if (r.ok) { data.reviews = data.reviews.filter(x => x.id != row.dataset.rid); renderReviews(); }
+      });
+    });
+  }
+
+  function renderActivity(){
+    const el = document.getElementById('activityBody');
+    const items = [
+      ...data.shoppers.map(s => ({ t:'Styliste', name: s.studio_name||s.name||s.email, at: s.created_at })),
+      ...data.clients.map(c => ({ t:'Client', name: c.name + ' (' + c.shopper_name + ')', at: c.created_at })),
+    ].filter(x => x.at).sort((a,b) => new Date(b.at) - new Date(a.at)).slice(0, 12);
+    if (!items.length) { el.innerHTML = '<div class="pf-email" style="padding:10px 0;">—</div>'; return; }
+    el.innerHTML = items.map(i => `
+      <div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--hairline);font-size:13px;">
+        <span class="pf-tag">${i.t}</span>
+        <span class="pf-name" style="flex:1;">${esc(i.name)}</span>
+        <span class="pf-email">${fmtDate(i.at)}</span>
+      </div>`).join('');
   }
 
   function renderShoppers(q){
@@ -121,11 +172,18 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
         <td>${esc(s.public_city||'—')}</td>
         <td>${s.clients_count}</td>
         <td>${s.rating_count ? `<span class="pf-stars">${stars(s.rating_avg)}</span> <span class="pf-email">${s.rating_avg.toFixed(1)} (${s.rating_count})</span>` : '<span class="pf-email">—</span>'}</td>
-        <td><span class="pf-tag ${s.is_public?'pub':''}">${s.is_public?'Public':'Privé'}</span></td>
+        <td>
+          <span class="pf-tag ${s.is_public?'pub':''}">${s.is_public?'Public':'Privé'}</span>
+          ${s.suspended?'<span class="pf-tag" style="background:#fbeaea;border-color:#e0b4b4;color:#b03030;">Suspendu</span>':''}
+          ${s.featured?'<span class="pf-tag pub">★ En avant</span>':''}
+        </td>
         <td><div class="pf-actions">
-          ${s.is_admin ? '' : `<button class="pf-btn" data-act="manage" style="background:var(--ink);color:#fff;border-color:var(--ink);">Gérer le studio</button>`}
+          ${s.is_admin ? '' : `<button class="pf-btn" data-act="manage" style="background:var(--ink);color:#fff;border-color:var(--ink);">Gérer</button>`}
           ${s.public_slug ? `<a class="pf-btn" href="/s/${esc(s.public_slug)}" target="_blank">Profil</a>` : ''}
           <button class="pf-btn" data-act="togglePublic">${s.is_public?'Dépublier':'Publier'}</button>
+          ${s.is_admin ? '' : `<button class="pf-btn" data-act="feature">${s.featured?'Retirer ★':'★ Avant'}</button>`}
+          ${s.is_admin ? '' : `<button class="pf-btn" data-act="suspend">${s.suspended?'Réactiver':'Suspendre'}</button>`}
+          ${s.is_admin ? '' : `<button class="pf-btn" data-act="resetPwd">Reset MDP</button>`}
           ${s.is_admin ? '' : '<button class="pf-btn danger" data-act="delShopper">Supprimer</button>'}
         </div></td>
       </tr>`).join('') || '<tr><td colspan="7" class="pf-email" style="padding:20px;">Aucun résultat.</td></tr>';
@@ -136,6 +194,24 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
       tr.querySelector('[data-act=manage]')?.addEventListener('click', async () => {
         const r = await fetch(`/api/admin/impersonate/${id}`, { method: 'POST' });
         if (r.ok) location.href = '/admin'; else alert('Erreur');
+      });
+      tr.querySelector('[data-act=feature]')?.addEventListener('click', async () => {
+        const r = await fetch(`/api/admin/shopper/${id}/featured`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ featured: !s.featured }) });
+        if (r.ok) { s.featured = !s.featured; renderShoppers(document.getElementById('searchShoppers').value); }
+      });
+      tr.querySelector('[data-act=suspend]')?.addEventListener('click', async () => {
+        if (!s.suspended && !confirm(`Suspendre "${s.studio_name||s.name}" ? Sa connexion sera bloquée.`)) return;
+        const r = await fetch(`/api/admin/shopper/${id}/suspend`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ suspended: !s.suspended }) });
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) { alert(d.error||'Erreur'); return; }
+        s.suspended = !s.suspended; renderShoppers(document.getElementById('searchShoppers').value);
+      });
+      tr.querySelector('[data-act=resetPwd]')?.addEventListener('click', async () => {
+        if (!confirm(`Réinitialiser le mot de passe de "${s.studio_name||s.name}" ?`)) return;
+        const r = await fetch(`/api/admin/shopper/${id}/reset-password`, { method:'POST' });
+        const d = await r.json().catch(()=>({}));
+        if (r.ok) prompt('Nouveau mot de passe temporaire (à communiquer au styliste) :', d.password);
+        else alert(d.error||'Erreur');
       });
       tr.querySelector('[data-act=togglePublic]')?.addEventListener('click', async () => {
         const r = await fetch(`/api/admin/shopper/${id}/public`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_public: !s.is_public }) });
@@ -164,9 +240,11 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
         <td class="pf-email">${esc(c.email||'—')}</td>
         <td>${esc(c.shopper_name)}</td>
         <td><code style="font-family:monospace;letter-spacing:1px;background:var(--bg-soft);padding:2px 6px;border-radius:3px;">${esc(c.access_code||'—')}</code></td>
-        <td><span class="pf-tag ${c.claimed?'pub':''}">${c.claimed?'Actif':'En attente'}</span></td>
+        <td><span class="pf-tag ${c.claimed?'pub':''}">${c.claimed?'Actif':'En attente'}</span>${c.suspended?' <span class="pf-tag" style="background:#fbeaea;border-color:#e0b4b4;color:#b03030;">Suspendu</span>':''}</td>
         <td><div class="pf-actions">
           <a class="pf-btn" href="/c/${esc(c.slug)}?code=${esc(c.access_code||'')}" target="_blank">Espace</a>
+          <button class="pf-btn" data-act="magic">Nouveau lien</button>
+          <button class="pf-btn" data-act="suspendC">${c.suspended?'Réactiver':'Suspendre'}</button>
           <button class="pf-btn danger" data-act="delClient">Supprimer</button>
         </div></td>
       </tr>`).join('') || '<tr><td colspan="6" class="pf-email" style="padding:20px;">Aucun résultat.</td></tr>';
@@ -174,6 +252,16 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
     document.querySelectorAll('#clientsBody tr[data-cid]').forEach(tr => {
       const id = +tr.dataset.cid;
       const c = data.clients.find(x => x.id === id);
+      tr.querySelector('[data-act=magic]')?.addEventListener('click', async () => {
+        const r = await fetch(`/api/admin/client/${id}/magic-link`, { method:'POST' });
+        const d = await r.json().catch(()=>({}));
+        if (r.ok) prompt('Nouveau lien d\'accès pour ce client :', d.magic_url);
+        else alert(d.error||'Erreur');
+      });
+      tr.querySelector('[data-act=suspendC]')?.addEventListener('click', async () => {
+        const r = await fetch(`/api/admin/client/${id}/suspend`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ suspended: !c.suspended }) });
+        if (r.ok) { c.suspended = !c.suspended; renderClients(document.getElementById('searchClients').value); }
+      });
       tr.querySelector('[data-act=delClient]')?.addEventListener('click', async () => {
         if (!confirm(`Supprimer le client "${c.name}" et ses données ? Irréversible.`)) return;
         const r = await fetch(`/api/admin/client/${id}`, { method:'DELETE' });

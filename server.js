@@ -199,6 +199,7 @@ app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
   const shopperRows = shoppers.map(s => ({
     id: s.id, email: s.email, name: s.name, studio_name: s.studio_name,
     is_admin: !!s.is_admin, is_public: !!s.is_public, public_slug: s.public_slug,
+    suspended: !!s.suspended, featured: !!s.featured,
     public_city: s.public_city, specialties: s.specialties, years_experience: s.years_experience,
     clients_count: byShopper[s.id] || 0,
     rating_avg: ratings[s.id]?.avg ?? null, rating_count: ratings[s.id]?.count ?? 0,
@@ -208,9 +209,16 @@ app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
   shoppers.forEach(s => shopperName[s.id] = s.studio_name || s.name || s.email);
   const clientRows = clients.map(c => ({
     id: c.id, name: c.name, email: c.email, slug: c.slug,
-    access_code: codeFromSlug(c.slug),
+    access_code: codeFromSlug(c.slug), suspended: !!c.suspended,
     shopper_id: c.user_id, shopper_name: shopperName[c.user_id] || '—',
     claimed: !!c.claimed_at, created_at: c.created_at,
+  }));
+  // Avis (pour modération)
+  const { data: rdata } = await sb.from('shopper_ratings').select('id, shopper_id, client_id, stars, review, created_at').not('review','is',null).order('created_at', { ascending: false }).limit(60);
+  const cName = {}; clients.forEach(c => cName[c.id] = c.name);
+  const reviews = (rdata || []).filter(r => (r.review||'').trim()).map(r => ({
+    id: r.id, stars: r.stars, review: r.review, created_at: r.created_at,
+    shopper_name: shopperName[r.shopper_id] || '—', client_name: cName[r.client_id] || 'Client',
   }));
   res.json({
     stats: {
@@ -220,6 +228,7 @@ app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
     },
     shoppers: shopperRows,
     clients: clientRows,
+    reviews,
   });
 }));
 
@@ -257,6 +266,44 @@ app.post('/api/admin/stop-impersonate', ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Suspendre / réactiver
+app.put('/api/admin/shopper/:id/suspend', requireAdmin, ah(async (req, res) => {
+  if (+req.params.id === req.session.userId) return res.status(400).json({ error: 'Pas sur votre propre compte.' });
+  await dbUpdate('users', { id: req.params.id }, { suspended: !!req.body?.suspended });
+  res.json({ ok: true });
+}));
+app.put('/api/admin/client/:id/suspend', requireAdmin, ah(async (req, res) => {
+  await dbUpdate('clients', { id: req.params.id }, { suspended: !!req.body?.suspended });
+  res.json({ ok: true });
+}));
+// Mise en avant (épinglé en tête de /discover)
+app.put('/api/admin/shopper/:id/featured', requireAdmin, ah(async (req, res) => {
+  await dbUpdate('users', { id: req.params.id }, { featured: !!req.body?.featured });
+  res.json({ ok: true });
+}));
+// Réinitialiser le mot de passe d'un styliste → renvoie un mot de passe temporaire
+app.post('/api/admin/shopper/:id/reset-password', requireAdmin, ah(async (req, res) => {
+  const pwd = nanoid(10);
+  await dbUpdate('users', { id: req.params.id }, { password_hash: bcrypt.hashSync(pwd, 10) });
+  res.json({ ok: true, password: pwd });
+}));
+// Nouveau lien magique pour un client
+app.post('/api/admin/client/:id/magic-link', requireAdmin, ah(async (req, res) => {
+  const c = await dbFirst('clients', { id: req.params.id }, { select: 'id, slug' });
+  if (!c) return res.sendStatus(404);
+  const token = nanoid(40);
+  const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+  await dbUpdate('clients', { id: c.id }, { magic_token: token, magic_expires: expires });
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  res.json({ ok: true, magic_url: `${proto}://${host}/c/auth/magic/${token}` });
+}));
+// Modérer un avis
+app.delete('/api/admin/rating/:id', requireAdmin, ah(async (req, res) => {
+  await dbDelete('shopper_ratings', { id: req.params.id });
+  res.json({ ok: true });
+}));
+
 /* ═══════════════════════════════════════════ */
 /*               AUTH SHOPPER                  */
 /* ═══════════════════════════════════════════ */
@@ -267,6 +314,7 @@ app.post('/api/auth/login', ah(async (req, res) => {
   if (!u || !bcrypt.compareSync(password, u.password_hash)) {
     return res.status(401).json({ error: 'identifiants invalides' });
   }
+  if (u.suspended) return res.status(403).json({ error: 'Ce compte est suspendu. Contactez l\'administrateur.' });
   req.session.userId = u.id;
   res.json({ id: u.id, email: u.email, name: u.name });
 }));
@@ -1146,6 +1194,7 @@ app.post('/c/auth/login', ah(async (req, res) => {
   if (!c || !c.password_hash || !bcrypt.compareSync(password, c.password_hash)) {
     return res.status(401).json({ error: 'identifiants invalides' });
   }
+  if (c.suspended) return res.status(403).json({ error: 'Accès suspendu. Contactez votre styliste.' });
   req.session.clientId = c.id;
   const now = new Date().toISOString();
   await dbUpdate('clients', { id: c.id }, {
@@ -1251,7 +1300,16 @@ app.get('/api/discover', ah(async (req, res) => {
     .not('public_slug', 'is', null)
     .order('id', { ascending: false });
   if (error) throw error;
-  const rows = data || [];
+  let rows = data || [];
+  // Suspendus masqués + épinglés en tête (défensif : colonnes ajoutées par migration 008)
+  try {
+    const { data: flags } = await sb.from('users').select('id, suspended, featured').eq('is_public', true);
+    if (flags) {
+      const m = Object.fromEntries(flags.map(f => [f.id, f]));
+      rows = rows.filter(r => !m[r.id]?.suspended);
+      rows.sort((a, b) => ((m[b.id]?.featured ? 1 : 0) - (m[a.id]?.featured ? 1 : 0)));
+    }
+  } catch {}
   const ratings = await ratingsFor(rows.map(r => r.id));
   rows.forEach(r => { const rt = ratings[r.id]; r.rating_avg = rt ? rt.avg : null; r.rating_count = rt ? rt.count : 0; });
   res.json(rows);

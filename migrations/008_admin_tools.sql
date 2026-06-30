@@ -1,0 +1,4 @@
+-- Outils admin : suspension de comptes + mise en avant
+ALTER TABLE users   ADD COLUMN IF NOT EXISTS suspended BOOLEAN DEFAULT FALSE;
+ALTER TABLE users   ADD COLUMN IF NOT EXISTS featured  BOOLEAN DEFAULT FALSE;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS suspended BOOLEAN DEFAULT FALSE;
