@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Administration — Studio</title>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=2">
 <style>
   html { scroll-behavior: smooth; }
   body { background: #e9e9ea; }
@@ -192,15 +193,17 @@ const I = {
         </main>
       </div>`;
 
-    renderShoppers(''); renderClients(''); renderReviews(); renderActivity();
-    document.getElementById('searchShoppers').addEventListener('input', e => renderShoppers(e.target.value));
-    document.getElementById('searchClients').addEventListener('input', e => renderClients(e.target.value));
-    document.getElementById('logoutBtn').addEventListener('click', async () => { await fetch('/api/auth/logout', { method:'POST' }); location.href = '/login'; });
-    // nav active au scroll
-    const links = [...document.querySelectorAll('.ad-navlink')];
-    document.querySelectorAll('.ad-main [id^=sec-]').forEach(sec => {
-      new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const l = links.find(x => x.getAttribute('href') === '#'+e.target.id); if (l) { links.forEach(x=>x.classList.remove('active')); l.classList.add('active'); } } }), { rootMargin: '-20% 0px -70% 0px' }).observe(sec);
-    });
+    // chaque sous-rendu est isolé : une erreur ne vide jamais la page
+    [() => renderShoppers(''), () => renderClients(''), renderReviews, renderActivity].forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
+    document.getElementById('searchShoppers')?.addEventListener('input', e => renderShoppers(e.target.value));
+    document.getElementById('searchClients')?.addEventListener('input', e => renderClients(e.target.value));
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => { await fetch('/api/auth/logout', { method:'POST' }); location.href = '/login'; });
+    try {
+      const links = [...document.querySelectorAll('.ad-navlink')];
+      if (window.IntersectionObserver) document.querySelectorAll('.ad-main [id^=sec-]').forEach(sec => {
+        new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const l = links.find(x => x.getAttribute('href') === '#'+e.target.id); if (l) { links.forEach(x=>x.classList.remove('active')); l.classList.add('active'); } } }), { rootMargin: '-20% 0px -70% 0px' }).observe(sec);
+      });
+    } catch (e) { console.error(e); }
   }
   function svg(p){ return `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`; }
 
