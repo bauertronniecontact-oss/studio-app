@@ -5,359 +5,203 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Administration — Studio</title>
-<link rel="stylesheet" href="/css/style.css?v=2">
 <style>
-  html { scroll-behavior: smooth; }
-  body { background: #e9e9ea; }
-  .ad-shell { display: flex; gap: 18px; padding: 18px; min-height: 100vh; box-sizing: border-box; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9e9ea; font-family: 'Inter', system-ui, sans-serif; color: #111; }
+  .serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+  a { text-decoration: none; }
 
-  /* Sidebar */
-  .ad-nav { width: 230px; flex-shrink: 0; background: #fff; border-radius: 22px; padding: 26px 18px; display: flex; flex-direction: column; position: sticky; top: 18px; height: calc(100vh - 36px); }
-  .ad-logo { display: flex; align-items: center; gap: 10px; font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 500; padding: 0 8px 28px; }
-  .ad-logo .lg { width: 30px; height: 30px; background: var(--ink); color: #fff; border-radius: 9px; display: grid; place-items: center; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700; }
-  .ad-navlist { display: flex; flex-direction: column; gap: 4px; }
-  .ad-navlink { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 13px; color: var(--ink-soft); text-decoration: none; font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 500; transition: background .15s, color .15s; cursor: pointer; }
-  .ad-navlink svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; flex-shrink: 0; }
-  .ad-navlink:hover { background: var(--bg-soft); color: var(--ink); }
-  .ad-navlink.active { background: var(--ink); color: #fff; }
-  .ad-profile { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px 0; border-top: 1px solid var(--hairline); }
-  .ad-profile .pp { width: 38px; height: 38px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: 'Inter', sans-serif; font-weight: 700; font-size: 14px; }
-  .ad-profile .pi { min-width: 0; }
-  .ad-profile .pn { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--ink); }
-  .ad-profile .pe { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
-  .ad-logout { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; margin-top: 10px; text-align: left; padding: 4px 8px; font-family: 'Inter', sans-serif; }
-  .ad-logout:hover { color: #b03030; }
+  .shell { display: grid; grid-template-columns: 230px 1fr; gap: 18px; padding: 18px; align-items: start; }
+  @media (max-width: 820px) { .shell { grid-template-columns: 1fr; } }
 
-  /* Main */
-  .ad-main { flex: 1; min-width: 0; }
-  .ad-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; padding: 6px 4px; }
-  .ad-head h1 { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 500; }
-  .ad-head .sub { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .side { background: #fff; border-radius: 20px; padding: 24px 16px; }
+  .side .logo { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 500; padding: 0 6px 24px; }
+  .side .logo .lg { width: 30px; height: 30px; background: #111; color: #fff; border-radius: 9px; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+  .nav a { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 12px; color: #555; font-size: 14px; font-weight: 500; margin-bottom: 3px; }
+  .nav a:hover { background: #f3f2f0; color: #111; }
+  .nav a.on { background: #111; color: #fff; }
+  .side .prof { margin-top: 22px; padding-top: 16px; border-top: 1px solid #eee; display: flex; gap: 10px; align-items: center; }
+  .side .prof .pp { width: 36px; height: 36px; border-radius: 50%; background: #111; color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .side .prof .pn { font-size: 13px; font-weight: 600; }
+  .side .prof .pe { font-size: 11px; color: #999; }
+  .side .out { background: none; border: none; color: #999; cursor: pointer; font-size: 12px; margin-top: 14px; padding: 4px 6px; }
+  .side .out:hover { color: #b03030; }
 
-  /* Stat cards */
-  .ad-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 18px; }
-  @media (max-width: 1100px) { .ad-stats { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 560px) { .ad-stats { grid-template-columns: repeat(2, 1fr); } }
-  .ad-stat { background: #fff; border-radius: 18px; padding: 20px 18px; text-align: center; }
-  .ad-stat.dark { background: var(--ink); color: #fff; }
-  .ad-stat .ic { width: 42px; height: 42px; border-radius: 50%; background: var(--bg-soft); display: grid; place-items: center; margin: 0 auto 14px; }
-  .ad-stat.dark .ic { background: rgba(255,255,255,0.12); }
-  .ad-stat .ic svg { width: 18px; height: 18px; stroke: var(--ink); fill: none; stroke-width: 1.6; }
-  .ad-stat.dark .ic svg { stroke: #fff; }
-  .ad-stat .n { font-family: 'Cormorant Garamond', serif; font-size: 30px; line-height: 1; }
-  .ad-stat .l { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--muted); margin-top: 7px; letter-spacing: 0.02em; }
-  .ad-stat.dark .l { color: rgba(255,255,255,0.7); }
+  .main { min-width: 0; }
+  .h1 { font-size: 30px; font-weight: 500; margin: 4px 0 2px; }
+  .h1s { font-size: 13px; color: #999; margin-bottom: 20px; }
 
-  /* Card section */
-  .ad-card { background: #fff; border-radius: 20px; padding: 22px 24px; margin-bottom: 18px; }
-  .ad-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-  .ad-card-head h2 { font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 500; }
-  .ad-card-head .c-sub { font-size: 12px; color: var(--muted); }
-  .ad-search { width: 230px; max-width: 100%; background: var(--bg-soft); border: 1px solid transparent; padding: 9px 14px; font-size: 13px; border-radius: 11px; font-family: 'Inter', sans-serif; }
-  .ad-search:focus { outline: none; border-color: var(--hairline-strong); background: #fff; }
+  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 18px; }
+  @media (max-width: 1100px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat { background: #fff; border-radius: 18px; padding: 20px; text-align: center; }
+  .stat.dark { background: #111; color: #fff; }
+  .stat .n { font-size: 30px; line-height: 1; font-weight: 500; }
+  .stat .l { font-size: 11px; color: #999; margin-top: 8px; }
+  .stat.dark .l { color: rgba(255,255,255,.65); }
 
-  /* Tables */
-  .ad-table { width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 13px; }
-  .ad-table th { text-align: left; font-size: 11px; letter-spacing: 0.04em; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--hairline); }
-  .ad-table td { padding: 13px 12px; border-bottom: 1px solid var(--hairline); vertical-align: middle; }
-  .ad-table tr:last-child td { border-bottom: none; }
-  .ad-table tr:hover td { background: #fafafa; }
-  .ad-name { font-weight: 600; color: var(--ink); }
-  .ad-email { color: var(--muted); font-size: 12px; }
-  .ad-pill { display: inline-block; font-size: 11px; padding: 4px 11px; border-radius: 20px; background: var(--bg-soft); color: var(--ink-soft); font-weight: 500; }
-  .ad-pill.green { background: #e8f3ec; color: #2e7d4f; }
-  .ad-pill.gold { background: rgba(184,145,90,0.14); color: var(--accent); }
-  .ad-pill.red { background: #fbeaea; color: #b03030; }
-  .ad-pill.dark { background: var(--ink); color: #fff; }
-  .ad-acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
-  .ad-btn { font-family: 'Inter', sans-serif; font-size: 11.5px; padding: 6px 11px; border: 1px solid var(--hairline-strong); background: #fff; color: var(--ink); cursor: pointer; border-radius: 9px; transition: all .15s; white-space: nowrap; }
-  .ad-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .ad-btn.dark { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .ad-btn.dark:hover { background: var(--accent); border-color: var(--accent); }
-  .ad-btn.danger:hover { background: #b03030; border-color: #b03030; }
-  .ad-stars { color: var(--accent); letter-spacing: 1px; font-size: 12px; }
-  .ad-code { font-family: monospace; letter-spacing: 1px; background: var(--bg-soft); padding: 2px 7px; border-radius: 6px; font-size: 12px; }
-  .ad-empty { padding: 16px; color: var(--muted); font-family: 'Cormorant Garamond', serif; font-style: italic; }
-  .ad-loading { padding: 80px; text-align: center; font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--muted); }
+  .card { background: #fff; border-radius: 20px; padding: 22px 22px; margin-bottom: 18px; }
+  .card .ch { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .card .ch h2 { font-size: 20px; font-weight: 500; margin: 0; }
+  .card .ch .cs { font-size: 12px; color: #999; }
+  .search { background: #f3f2f0; border: 1px solid transparent; padding: 9px 13px; border-radius: 11px; font-size: 13px; width: 220px; max-width: 100%; }
+  .search:focus { outline: none; background: #fff; border-color: #ddd; }
 
-  @media (max-width: 820px) {
-    .ad-shell { flex-direction: column; padding: 12px; }
-    .ad-nav { width: auto; height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px; }
-    .ad-logo { padding: 0 8px 0 0; }
-    .ad-navlist { flex-direction: row; flex-wrap: wrap; flex: 1; }
-    .ad-navlink { padding: 8px 11px; }
-    .ad-navlink span { display: none; }
-    .ad-profile { margin: 0; border: none; padding: 0; }
-    .ad-logout { display: none; }
-    .ad-table thead { display: none; }
-    .ad-table td { display: block; padding: 3px 0; border: none; }
-    .ad-table tr { display: block; padding: 12px 0; border-bottom: 1px solid var(--hairline-strong); }
-    .ad-acts { justify-content: flex-start; margin-top: 8px; }
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; color: #999; font-weight: 500; padding: 9px 10px; border-bottom: 1px solid #eee; }
+  td { padding: 12px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .nm { font-weight: 600; }
+  .em { color: #999; font-size: 12px; }
+  .pill { display: inline-block; font-size: 11px; padding: 4px 10px; border-radius: 18px; background: #f3f2f0; color: #555; }
+  .pill.green { background: #e8f3ec; color: #2e7d4f; }
+  .pill.gold { background: rgba(184,145,90,.15); color: #b8915a; }
+  .pill.red { background: #fbeaea; color: #b03030; }
+  .pill.dark { background: #111; color: #fff; }
+  .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .b { font-size: 11.5px; padding: 6px 11px; border: 1px solid #ddd; background: #fff; color: #111; cursor: pointer; border-radius: 9px; white-space: nowrap; }
+  .b:hover { background: #b8915a; color: #fff; border-color: #b8915a; }
+  .b.k { background: #111; color: #fff; border-color: #111; }
+  .b.k:hover { background: #b8915a; border-color: #b8915a; }
+  .b.d:hover { background: #b03030; border-color: #b03030; }
+  .stars { color: #b8915a; letter-spacing: 1px; }
+  .code { font-family: monospace; background: #f3f2f0; padding: 2px 7px; border-radius: 6px; }
+  .row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .empty { color: #999; font-style: italic; padding: 16px; }
+  .center { text-align: center; padding: 80px; color: #999; font-style: italic; }
+  @media (max-width: 700px) { thead { display: none; } td { display: block; padding: 3px 0; border: none; } tr { display: block; padding: 12px 0; border-bottom: 1px solid #ddd; } .acts { justify-content: flex-start; margin-top: 8px; } }
 </style>
 </head>
 <body>
-<div id="root"><div class="ad-loading">Chargement…</div></div>
+<div id="root"><div class="center">Chargement…</div></div>
 
 <script>
-const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o+=`<span style="color:${i<=f?'var(--accent)':'var(--hairline-strong)'}">★</span>`; return o; };
-const I = {
-  dash: '<path d="M3 9.5L12 3l9 6.5"/><path d="M5 9v11h14V9"/>',
-  shop: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>',
-  client: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',
-  star: '<path d="M12 2l3 6.5 7 .6-5.2 4.6L18.5 21 12 17.3 5.5 21l1.7-7.3L2 9.1l7-.6z"/>',
-  pulse: '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
-  bag: '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
-  check: '<path d="M20 6L9 17l-5-5"/>',
-};
+var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+var stars = function(a){ var f=Math.round(a||0),o=''; for(var i=1;i<=5;i++) o+='<span style="color:'+(i<=f?'#b8915a':'#ccc')+'">★</span>'; return o; };
+var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e){ return ''; } };
 
-(async function(){
-  const root = document.getElementById('root');
-  let me;
-  try { me = await fetch('/api/me').then(r => r.ok ? r.json() : null); } catch {}
-  if (!me) { location.href = '/login'; return; }
-  if (!me.is_admin) { root.innerHTML = '<div class="ad-loading">Accès réservé à l\'administrateur.</div>'; return; }
+(function(){
+  var root = document.getElementById('root');
+  var DATA = null, ME = null, qs = '', qc = '';
 
-  let data;
-  try { data = await fetch('/api/admin/overview').then(r => r.json()); }
-  catch { root.innerHTML = '<div class="ad-loading">Erreur de chargement.</div>'; return; }
+  fetch('/api/me').then(function(r){ return r.ok ? r.json() : null; }).then(function(me){
+    if (!me) { location.href = '/login'; return; }
+    ME = me;
+    if (!me.is_admin) { root.innerHTML = '<div class="center">Accès réservé à l\'administrateur.<br><br><a href="/admin">← Retour</a></div>'; return; }
+    return fetch('/api/admin/overview').then(function(r){ return r.json(); }).then(function(d){ DATA = d; draw(); });
+  }).catch(function(e){ root.innerHTML = '<div class="center">Erreur : ' + esc(e && e.message) + '</div>'; });
 
-  const adminInit = ((me.name || me.email || 'A').trim().charAt(0) || 'A').toUpperCase();
-
-  function render(){
-    const st = data.stats;
-    const statCard = (icon, n, l, dark) => `
-      <div class="ad-stat ${dark?'dark':''}"><div class="ic">${svg(icon)}</div><div class="n">${n}</div><div class="l">${l}</div></div>`;
-    root.innerHTML = `
-      <div class="ad-shell">
-        <aside class="ad-nav">
-          <div class="ad-logo"><span class="lg">S</span> Admin</div>
-          <nav class="ad-navlist">
-            <a class="ad-navlink active" href="#sec-top">${svg(I.dash)}<span>Tableau de bord</span></a>
-            <a class="ad-navlink" href="#sec-shoppers">${svg(I.shop)}<span>Stylistes</span></a>
-            <a class="ad-navlink" href="#sec-clients">${svg(I.client)}<span>Clients</span></a>
-            <a class="ad-navlink" href="#sec-reviews">${svg(I.star)}<span>Avis</span></a>
-            <a class="ad-navlink" href="#sec-activity">${svg(I.pulse)}<span>Activité</span></a>
-          </nav>
-          <div class="ad-profile">
-            <div class="pp">${adminInit}</div>
-            <div class="pi"><div class="pn">${esc(me.name || 'Administrateur')}</div><div class="pe">${esc(me.email||'')}</div></div>
-          </div>
-          <button class="ad-logout" id="logoutBtn">Se déconnecter</button>
-        </aside>
-
-        <main class="ad-main" id="sec-top">
-          <div class="ad-head">
-            <div><h1>Tableau de bord</h1><div class="sub">Vue d'ensemble de la plateforme</div></div>
-          </div>
-
-          <div class="ad-stats">
-            ${statCard(I.shop, st.shoppers, 'Stylistes')}
-            ${statCard(I.check, st.public_shoppers, 'Publics')}
-            ${statCard(I.client, st.clients, 'Clients', true)}
-            ${statCard(I.check, st.claimed_clients, 'Clients actifs')}
-            ${statCard(I.bag, st.items, 'Pièces')}
-            ${statCard(I.star, st.ratings, 'Avis')}
-          </div>
-
-          <div class="ad-card" id="sec-shoppers">
-            <div class="ad-card-head">
-              <div><h2>Personal Shoppers</h2><div class="c-sub">${data.shoppers.length} compte${data.shoppers.length>1?'s':''}</div></div>
-              <input class="ad-search" id="searchShoppers" placeholder="Rechercher un styliste…">
-            </div>
-            <table class="ad-table"><thead><tr>
-              <th>Studio / Nom</th><th>Email</th><th>Ville</th><th>Clients</th><th>Note</th><th>Statut</th><th></th>
-            </tr></thead><tbody id="shoppersBody"></tbody></table>
-          </div>
-
-          <div class="ad-card" id="sec-clients">
-            <div class="ad-card-head">
-              <div><h2>Clients</h2><div class="c-sub">${data.clients.length} compte${data.clients.length>1?'s':''}</div></div>
-              <input class="ad-search" id="searchClients" placeholder="Rechercher un client…">
-            </div>
-            <table class="ad-table"><thead><tr>
-              <th>Nom</th><th>Email</th><th>Styliste</th><th>Code</th><th>Statut</th><th></th>
-            </tr></thead><tbody id="clientsBody"></tbody></table>
-          </div>
-
-          <div class="ad-card" id="sec-reviews">
-            <div class="ad-card-head"><div><h2>Avis à modérer</h2><div class="c-sub">${(data.reviews||[]).length} avis</div></div></div>
-            <div id="reviewsBody"></div>
-          </div>
-
-          <div class="ad-card" id="sec-activity">
-            <div class="ad-card-head"><div><h2>Activité récente</h2><div class="c-sub">Derniers comptes créés</div></div></div>
-            <div id="activityBody"></div>
-          </div>
-        </main>
-      </div>`;
-
-    // chaque sous-rendu est isolé : une erreur ne vide jamais la page
-    [() => renderShoppers(''), () => renderClients(''), renderReviews, renderActivity].forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
-    document.getElementById('searchShoppers')?.addEventListener('input', e => renderShoppers(e.target.value));
-    document.getElementById('searchClients')?.addEventListener('input', e => renderClients(e.target.value));
-    document.getElementById('logoutBtn')?.addEventListener('click', async () => { await fetch('/api/auth/logout', { method:'POST' }); location.href = '/login'; });
-    try {
-      const links = [...document.querySelectorAll('.ad-navlink')];
-      if (window.IntersectionObserver) document.querySelectorAll('.ad-main [id^=sec-]').forEach(sec => {
-        new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const l = links.find(x => x.getAttribute('href') === '#'+e.target.id); if (l) { links.forEach(x=>x.classList.remove('active')); l.classList.add('active'); } } }), { rootMargin: '-20% 0px -70% 0px' }).observe(sec);
-      });
-    } catch (e) { console.error(e); }
+  function shopRows(){
+    var q = qs.toLowerCase();
+    var rows = DATA.shoppers.filter(function(s){ return !q || (s.studio_name||'').toLowerCase().indexOf(q)>=0 || (s.name||'').toLowerCase().indexOf(q)>=0 || (s.email||'').toLowerCase().indexOf(q)>=0; });
+    if (!rows.length) return '<tr><td colspan="7" class="empty">Aucun résultat.</td></tr>';
+    return rows.map(function(s){
+      var rt = s.rating_count ? '<span class="stars">'+stars(s.rating_avg)+'</span> <span class="em">'+s.rating_avg.toFixed(1)+'</span>' : '<span class="em">—</span>';
+      var st = '<span class="pill '+(s.is_public?'green':'')+'">'+(s.is_public?'Public':'Privé')+'</span>' + (s.suspended?' <span class="pill red">Suspendu</span>':'') + (s.featured?' <span class="pill gold">★</span>':'');
+      var acts = s.is_admin ? '' :
+        '<button class="b k" data-a="manage" data-id="'+s.id+'">Gérer</button>' +
+        (s.public_slug?'<a class="b" href="/s/'+esc(s.public_slug)+'" target="_blank">Profil</a>':'') +
+        '<button class="b" data-a="pub" data-id="'+s.id+'">'+(s.is_public?'Dépublier':'Publier')+'</button>' +
+        '<button class="b" data-a="feat" data-id="'+s.id+'">'+(s.featured?'Retirer ★':'★')+'</button>' +
+        '<button class="b" data-a="susp" data-id="'+s.id+'">'+(s.suspended?'Réactiver':'Suspendre')+'</button>' +
+        '<button class="b" data-a="pwd" data-id="'+s.id+'">Reset</button>' +
+        '<button class="b d" data-a="delS" data-id="'+s.id+'">Suppr.</button>';
+      return '<tr><td><span class="nm">'+esc(s.studio_name||s.name||'—')+'</span>'+(s.is_admin?' <span class="pill dark">admin</span>':'')+'</td>' +
+        '<td class="em">'+esc(s.email||'—')+'</td><td>'+esc(s.public_city||'—')+'</td><td>'+s.clients_count+'</td><td>'+rt+'</td><td>'+st+'</td><td><div class="acts">'+acts+'</div></td></tr>';
+    }).join('');
   }
-  function svg(p){ return `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`; }
-
-  function fmtDate(d){ try { return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }); } catch { return ''; } }
-
-  function renderShoppers(q){
-    q = q.trim().toLowerCase();
-    const rows = data.shoppers.filter(s => !q ||
-      (s.studio_name||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q) ||
-      (s.email||'').toLowerCase().includes(q) || (s.public_city||'').toLowerCase().includes(q));
-    document.getElementById('shoppersBody').innerHTML = rows.map(s => `
-      <tr data-sid="${s.id}">
-        <td><span class="ad-name">${esc(s.studio_name || s.name || '—')}</span>${s.is_admin?' <span class="ad-pill dark">admin</span>':''}${s.name && s.studio_name ? `<div class="ad-email">${esc(s.name)}</div>` : ''}</td>
-        <td class="ad-email">${esc(s.email||'—')}</td>
-        <td>${esc(s.public_city||'—')}</td>
-        <td>${s.clients_count}</td>
-        <td>${s.rating_count ? `<span class="ad-stars">${stars(s.rating_avg)}</span> <span class="ad-email">${s.rating_avg.toFixed(1)} (${s.rating_count})</span>` : '<span class="ad-email">—</span>'}</td>
-        <td>
-          <span class="ad-pill ${s.is_public?'green':''}">${s.is_public?'Public':'Privé'}</span>
-          ${s.suspended?' <span class="ad-pill red">Suspendu</span>':''}
-          ${s.featured?' <span class="ad-pill gold">★</span>':''}
-        </td>
-        <td><div class="ad-acts">
-          ${s.is_admin ? '' : `<button class="ad-btn dark" data-act="manage">Gérer</button>`}
-          ${s.public_slug ? `<a class="ad-btn" href="/s/${esc(s.public_slug)}" target="_blank">Profil</a>` : ''}
-          <button class="ad-btn" data-act="togglePublic">${s.is_public?'Dépublier':'Publier'}</button>
-          ${s.is_admin ? '' : `<button class="ad-btn" data-act="feature">${s.featured?'Retirer ★':'★'}</button>`}
-          ${s.is_admin ? '' : `<button class="ad-btn" data-act="suspend">${s.suspended?'Réactiver':'Suspendre'}</button>`}
-          ${s.is_admin ? '' : `<button class="ad-btn" data-act="resetPwd">Reset MDP</button>`}
-          ${s.is_admin ? '' : '<button class="ad-btn danger" data-act="delShopper">Suppr.</button>'}
-        </div></td>
-      </tr>`).join('') || '<tr><td colspan="7" class="ad-empty">Aucun résultat.</td></tr>';
-
-    document.querySelectorAll('#shoppersBody tr[data-sid]').forEach(tr => {
-      const id = +tr.dataset.sid;
-      const s = data.shoppers.find(x => x.id === id);
-      const reS = () => renderShoppers(document.getElementById('searchShoppers').value);
-      tr.querySelector('[data-act=manage]')?.addEventListener('click', async () => {
-        const r = await fetch(`/api/admin/impersonate/${id}`, { method: 'POST' });
-        if (r.ok) location.href = '/admin'; else alert('Erreur');
-      });
-      tr.querySelector('[data-act=togglePublic]')?.addEventListener('click', async () => {
-        const r = await fetch(`/api/admin/shopper/${id}/public`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_public: !s.is_public }) });
-        if (r.ok) { s.is_public = !s.is_public; reS(); }
-      });
-      tr.querySelector('[data-act=feature]')?.addEventListener('click', async () => {
-        const r = await fetch(`/api/admin/shopper/${id}/featured`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ featured: !s.featured }) });
-        if (r.ok) { s.featured = !s.featured; reS(); }
-      });
-      tr.querySelector('[data-act=suspend]')?.addEventListener('click', async () => {
-        if (!s.suspended && !confirm(`Suspendre "${s.studio_name||s.name}" ? Sa connexion sera bloquée.`)) return;
-        const r = await fetch(`/api/admin/shopper/${id}/suspend`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ suspended: !s.suspended }) });
-        const d = await r.json().catch(()=>({}));
-        if (!r.ok) { alert(d.error||'Erreur'); return; }
-        s.suspended = !s.suspended; reS();
-      });
-      tr.querySelector('[data-act=resetPwd]')?.addEventListener('click', async () => {
-        if (!confirm(`Réinitialiser le mot de passe de "${s.studio_name||s.name}" ?`)) return;
-        const r = await fetch(`/api/admin/shopper/${id}/reset-password`, { method:'POST' });
-        const d = await r.json().catch(()=>({}));
-        if (r.ok) prompt('Nouveau mot de passe temporaire :', d.password); else alert(d.error||'Erreur');
-      });
-      tr.querySelector('[data-act=delShopper]')?.addEventListener('click', async () => {
-        if (!confirm(`Supprimer "${s.studio_name||s.name}" et TOUS ses clients/données ? Irréversible.`)) return;
-        const r = await fetch(`/api/admin/shopper/${id}`, { method:'DELETE' });
-        const d = await r.json().catch(()=>({}));
-        if (!r.ok) { alert(d.error || 'Erreur'); return; }
-        data.shoppers = data.shoppers.filter(x => x.id !== id);
-        data.clients = data.clients.filter(c => c.shopper_id !== id);
-        render();
-      });
-    });
+  function cliRows(){
+    var q = qc.toLowerCase();
+    var rows = DATA.clients.filter(function(c){ return !q || (c.name||'').toLowerCase().indexOf(q)>=0 || (c.email||'').toLowerCase().indexOf(q)>=0 || (c.shopper_name||'').toLowerCase().indexOf(q)>=0; });
+    if (!rows.length) return '<tr><td colspan="6" class="empty">Aucun résultat.</td></tr>';
+    return rows.map(function(c){
+      return '<tr><td><span class="nm">'+esc(c.name||'—')+'</span></td><td class="em">'+esc(c.email||'—')+'</td><td>'+esc(c.shopper_name)+'</td>' +
+        '<td><span class="code">'+esc(c.access_code||'—')+'</span></td>' +
+        '<td><span class="pill '+(c.claimed?'green':'')+'">'+(c.claimed?'Actif':'En attente')+'</span>'+(c.suspended?' <span class="pill red">Suspendu</span>':'')+'</td>' +
+        '<td><div class="acts"><a class="b" href="/c/'+esc(c.slug)+'?code='+esc(c.access_code||'')+'" target="_blank">Espace</a>' +
+        '<button class="b" data-a="magic" data-id="'+c.id+'">Lien</button>' +
+        '<button class="b" data-a="suspC" data-id="'+c.id+'">'+(c.suspended?'Réactiver':'Suspendre')+'</button>' +
+        '<button class="b d" data-a="delC" data-id="'+c.id+'">Suppr.</button></div></td></tr>';
+    }).join('');
+  }
+  function reviewRows(){
+    var rs = DATA.reviews || [];
+    if (!rs.length) return '<div class="empty">Aucun avis.</div>';
+    return rs.map(function(r){
+      return '<div class="row"><div class="stars" style="white-space:nowrap">'+stars(r.stars)+'</div>' +
+        '<div style="flex:1;min-width:0"><div class="serif" style="font-style:italic;color:#555">"'+esc(r.review)+'"</div>' +
+        '<div class="em">'+esc(r.client_name)+' → '+esc(r.shopper_name)+' · '+fdate(r.created_at)+'</div></div>' +
+        '<button class="b d" data-a="delR" data-id="'+r.id+'">Supprimer</button></div>';
+    }).join('');
+  }
+  function activityRows(){
+    var items = DATA.shoppers.map(function(s){ return {t:'Styliste',name:s.studio_name||s.name||s.email,at:s.created_at}; })
+      .concat(DATA.clients.map(function(c){ return {t:'Client',name:c.name+' ('+c.shopper_name+')',at:c.created_at}; }))
+      .filter(function(x){ return x.at; }).sort(function(a,b){ return new Date(b.at)-new Date(a.at); }).slice(0,12);
+    if (!items.length) return '<div class="empty">—</div>';
+    return items.map(function(i){ return '<div class="row"><span class="pill">'+i.t+'</span><span class="nm" style="flex:1">'+esc(i.name)+'</span><span class="em">'+fdate(i.at)+'</span></div>'; }).join('');
   }
 
-  function renderClients(q){
-    q = q.trim().toLowerCase();
-    const rows = data.clients.filter(c => !q ||
-      (c.name||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) ||
-      (c.shopper_name||'').toLowerCase().includes(q));
-    document.getElementById('clientsBody').innerHTML = rows.map(c => `
-      <tr data-cid="${c.id}">
-        <td><span class="ad-name">${esc(c.name||'—')}</span></td>
-        <td class="ad-email">${esc(c.email||'—')}</td>
-        <td>${esc(c.shopper_name)}</td>
-        <td><span class="ad-code">${esc(c.access_code||'—')}</span></td>
-        <td><span class="ad-pill ${c.claimed?'green':''}">${c.claimed?'Actif':'En attente'}</span>${c.suspended?' <span class="ad-pill red">Suspendu</span>':''}</td>
-        <td><div class="ad-acts">
-          <a class="ad-btn" href="/c/${esc(c.slug)}?code=${esc(c.access_code||'')}" target="_blank">Espace</a>
-          <button class="ad-btn" data-act="magic">Lien</button>
-          <button class="ad-btn" data-act="suspendC">${c.suspended?'Réactiver':'Suspendre'}</button>
-          <button class="ad-btn danger" data-act="delClient">Suppr.</button>
-        </div></td>
-      </tr>`).join('') || '<tr><td colspan="6" class="ad-empty">Aucun résultat.</td></tr>';
+  function draw(){
+    var st = DATA.stats;
+    var initial = ((ME.name||ME.email||'A').charAt(0)||'A').toUpperCase();
+    root.innerHTML =
+      '<div class="shell">' +
+        '<div class="side">' +
+          '<div class="logo"><span class="lg">S</span><span class="serif">Admin</span></div>' +
+          '<div class="nav">' +
+            '<a class="on" href="#">Tableau de bord</a>' +
+            '<a href="#sec-shop">Stylistes</a>' +
+            '<a href="#sec-cli">Clients</a>' +
+            '<a href="#sec-rev">Avis</a>' +
+            '<a href="#sec-act">Activité</a>' +
+          '</div>' +
+          '<div class="prof"><div class="pp">'+initial+'</div><div><div class="pn">'+esc(ME.name||'Administrateur')+'</div><div class="pe">'+esc(ME.email||'')+'</div></div></div>' +
+          '<button class="out" data-a="logout">Se déconnecter</button>' +
+        '</div>' +
+        '<div class="main">' +
+          '<div class="h1 serif">Tableau de bord</div><div class="h1s">Vue d\'ensemble de la plateforme</div>' +
+          '<div class="stats">' +
+            '<div class="stat"><div class="n serif">'+st.shoppers+'</div><div class="l">Stylistes</div></div>' +
+            '<div class="stat"><div class="n serif">'+st.public_shoppers+'</div><div class="l">Publics</div></div>' +
+            '<div class="stat dark"><div class="n serif">'+st.clients+'</div><div class="l">Clients</div></div>' +
+            '<div class="stat"><div class="n serif">'+st.claimed_clients+'</div><div class="l">Clients actifs</div></div>' +
+            '<div class="stat"><div class="n serif">'+st.items+'</div><div class="l">Pièces</div></div>' +
+            '<div class="stat"><div class="n serif">'+st.ratings+'</div><div class="l">Avis</div></div>' +
+          '</div>' +
+          '<div class="card" id="sec-shop"><div class="ch"><div><h2 class="serif">Personal Shoppers</h2><div class="cs">'+DATA.shoppers.length+' comptes</div></div><input class="search" id="qs" placeholder="Rechercher…" value="'+esc(qs)+'"></div>' +
+            '<table><thead><tr><th>Studio</th><th>Email</th><th>Ville</th><th>Clients</th><th>Note</th><th>Statut</th><th></th></tr></thead><tbody>'+shopRows()+'</tbody></table></div>' +
+          '<div class="card" id="sec-cli"><div class="ch"><div><h2 class="serif">Clients</h2><div class="cs">'+DATA.clients.length+' comptes</div></div><input class="search" id="qc" placeholder="Rechercher…" value="'+esc(qc)+'"></div>' +
+            '<table><thead><tr><th>Nom</th><th>Email</th><th>Styliste</th><th>Code</th><th>Statut</th><th></th></tr></thead><tbody>'+cliRows()+'</tbody></table></div>' +
+          '<div class="card" id="sec-rev"><div class="ch"><div><h2 class="serif">Avis</h2><div class="cs">'+(DATA.reviews||[]).length+'</div></div></div>'+reviewRows()+'</div>' +
+          '<div class="card" id="sec-act"><div class="ch"><div><h2 class="serif">Activité récente</h2></div></div>'+activityRows()+'</div>' +
+        '</div>' +
+      '</div>';
 
-    document.querySelectorAll('#clientsBody tr[data-cid]').forEach(tr => {
-      const id = +tr.dataset.cid;
-      const c = data.clients.find(x => x.id === id);
-      const reC = () => renderClients(document.getElementById('searchClients').value);
-      tr.querySelector('[data-act=magic]')?.addEventListener('click', async () => {
-        const r = await fetch(`/api/admin/client/${id}/magic-link`, { method:'POST' });
-        const d = await r.json().catch(()=>({}));
-        if (r.ok) prompt('Nouveau lien d\'accès pour ce client :', d.magic_url); else alert(d.error||'Erreur');
-      });
-      tr.querySelector('[data-act=suspendC]')?.addEventListener('click', async () => {
-        const r = await fetch(`/api/admin/client/${id}/suspend`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ suspended: !c.suspended }) });
-        if (r.ok) { c.suspended = !c.suspended; reC(); }
-      });
-      tr.querySelector('[data-act=delClient]')?.addEventListener('click', async () => {
-        if (!confirm(`Supprimer le client "${c.name}" et ses données ? Irréversible.`)) return;
-        const r = await fetch(`/api/admin/client/${id}`, { method:'DELETE' });
-        if (r.ok) { data.clients = data.clients.filter(x => x.id !== id); render(); }
-      });
-    });
+    var sEl = document.getElementById('qs'); if (sEl) sEl.oninput = function(e){ qs = e.target.value; var t = document.querySelector('#sec-shop tbody'); if (t) t.innerHTML = shopRows(); };
+    var cEl = document.getElementById('qc'); if (cEl) cEl.oninput = function(e){ qc = e.target.value; var t = document.querySelector('#sec-cli tbody'); if (t) t.innerHTML = cliRows(); };
   }
 
-  function renderReviews(){
-    const el = document.getElementById('reviewsBody');
-    const rs = data.reviews || [];
-    if (!rs.length) { el.innerHTML = '<div class="ad-empty">Aucun avis pour le moment.</div>'; return; }
-    el.innerHTML = rs.map(r => `
-      <div data-rid="${r.id}" style="display:flex;gap:14px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--hairline);">
-        <div class="ad-stars" style="white-space:nowrap;">${stars(r.stars)}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink-soft);">"${esc(r.review)}"</div>
-          <div class="ad-email" style="margin-top:3px;">${esc(r.client_name)} → ${esc(r.shopper_name)} · ${fmtDate(r.created_at)}</div>
-        </div>
-        <button class="ad-btn danger" data-act="delReview">Supprimer</button>
-      </div>`).join('');
-    el.querySelectorAll('[data-rid]').forEach(row => {
-      row.querySelector('[data-act=delReview]').addEventListener('click', async () => {
-        if (!confirm('Supprimer cet avis ?')) return;
-        const r = await fetch(`/api/admin/rating/${row.dataset.rid}`, { method:'DELETE' });
-        if (r.ok) { data.reviews = data.reviews.filter(x => x.id != row.dataset.rid); renderReviews(); }
-      });
-    });
-  }
-
-  function renderActivity(){
-    const el = document.getElementById('activityBody');
-    const items = [
-      ...data.shoppers.map(s => ({ t:'Styliste', name: s.studio_name||s.name||s.email, at: s.created_at })),
-      ...data.clients.map(c => ({ t:'Client', name: c.name + ' (' + c.shopper_name + ')', at: c.created_at })),
-    ].filter(x => x.at).sort((a,b) => new Date(b.at) - new Date(a.at)).slice(0, 12);
-    if (!items.length) { el.innerHTML = '<div class="ad-empty">—</div>'; return; }
-    el.innerHTML = items.map(i => `
-      <div style="display:flex;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--hairline);font-size:13px;">
-        <span class="ad-pill">${i.t}</span>
-        <span class="ad-name" style="flex:1;">${esc(i.name)}</span>
-        <span class="ad-email">${fmtDate(i.at)}</span>
-      </div>`).join('');
-  }
-
-  try { render(); }
-  catch (e) { root.innerHTML = '<div class="ad-loading">Erreur d\'affichage : ' + esc(e && e.message || e) + '</div>'; console.error(e); }
+  // Délégation : un seul listener pour toutes les actions
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('[data-a]'); if (!el) return;
+    var a = el.dataset.a, id = el.dataset.id;
+    var s = id && DATA ? DATA.shoppers.find(function(x){return x.id==id;}) : null;
+    var c = id && DATA ? DATA.clients.find(function(x){return x.id==id;}) : null;
+    if (a==='logout') { fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login'; }); }
+    else if (a==='manage') { fetch('/api/admin/impersonate/'+id,{method:'POST'}).then(function(r){ if(r.ok) location.href='/admin'; else alert('Erreur'); }); }
+    else if (a==='pub') { fetch('/api/admin/shopper/'+id+'/public',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_public:!s.is_public})}).then(function(r){ if(r.ok){ s.is_public=!s.is_public; refreshShop(); } }); }
+    else if (a==='feat') { fetch('/api/admin/shopper/'+id+'/featured',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({featured:!s.featured})}).then(function(r){ if(r.ok){ s.featured=!s.featured; refreshShop(); } }); }
+    else if (a==='susp') { if(!s.suspended && !confirm('Suspendre ce styliste ?')) return; fetch('/api/admin/shopper/'+id+'/suspend',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({suspended:!s.suspended})}).then(function(r){ if(r.ok){ s.suspended=!s.suspended; refreshShop(); } }); }
+    else if (a==='pwd') { if(!confirm('Réinitialiser le mot de passe ?')) return; fetch('/api/admin/shopper/'+id+'/reset-password',{method:'POST'}).then(function(r){return r.json();}).then(function(d){ if(d.password) prompt('Mot de passe temporaire :', d.password); else alert(d.error||'Erreur'); }); }
+    else if (a==='delS') { if(!confirm('Supprimer ce styliste et ses données ?')) return; fetch('/api/admin/shopper/'+id,{method:'DELETE'}).then(function(r){return r.json();}).then(function(d){ if(d.ok){ DATA.shoppers=DATA.shoppers.filter(function(x){return x.id!=id;}); DATA.clients=DATA.clients.filter(function(x){return x.shopper_id!=id;}); draw(); } else alert(d.error||'Erreur'); }); }
+    else if (a==='magic') { fetch('/api/admin/client/'+id+'/magic-link',{method:'POST'}).then(function(r){return r.json();}).then(function(d){ if(d.magic_url) prompt('Lien d\'accès :', d.magic_url); else alert(d.error||'Erreur'); }); }
+    else if (a==='suspC') { fetch('/api/admin/client/'+id+'/suspend',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({suspended:!c.suspended})}).then(function(r){ if(r.ok){ c.suspended=!c.suspended; refreshCli(); } }); }
+    else if (a==='delC') { if(!confirm('Supprimer ce client ?')) return; fetch('/api/admin/client/'+id,{method:'DELETE'}).then(function(r){ if(r.ok){ DATA.clients=DATA.clients.filter(function(x){return x.id!=id;}); draw(); } }); }
+    else if (a==='delR') { if(!confirm('Supprimer cet avis ?')) return; fetch('/api/admin/rating/'+id,{method:'DELETE'}).then(function(r){ if(r.ok){ DATA.reviews=DATA.reviews.filter(function(x){return x.id!=id;}); var t=document.querySelector('#sec-rev'); if(t){ var hd=t.querySelector('.ch'); t.innerHTML=''; t.appendChild(hd); t.insertAdjacentHTML('beforeend', reviewRows()); } draw(); } }); }
+  });
+  function refreshShop(){ var t=document.querySelector('#sec-shop tbody'); if(t) t.innerHTML = shopRows(); }
+  function refreshCli(){ var t=document.querySelector('#sec-cli tbody'); if(t) t.innerHTML = cliRows(); }
 })();
 </script>
 </body>
