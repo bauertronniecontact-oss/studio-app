@@ -184,6 +184,7 @@
   try { me = await api('/api/me'); }
   catch { location.href = '/login'; return; }
   applyWhiteLabel(me);
+  if (me.is_admin) { const pl = document.getElementById('sidePlatformLink'); if (pl) pl.style.display = ''; }
 
   // Charge le compteur de non-lus pour la sidebar (toutes les minutes)
   async function refreshInboxBadge() {

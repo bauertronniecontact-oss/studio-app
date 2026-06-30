@@ -151,6 +151,13 @@ const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(e
   res.status(500).json({ error: err?.message || 'server error' });
 });
 
+const requireAdmin = ah(async (req, res, next) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'unauthorized' });
+  const u = await dbFirst('users', { id: req.session.userId }, { select: 'id, is_admin' });
+  if (!u || !u.is_admin) return res.status(403).json({ error: 'admin requis' });
+  next();
+});
+
 /* ─────────── Admin seed ─────────── */
 (async () => {
   try {
@@ -158,18 +165,82 @@ const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(e
     if (!u) {
       const email = 'admin@studio.local';
       const pwd = 'studio2026';
-      await dbInsert('users', { email, password_hash: bcrypt.hashSync(pwd, 10), name: 'Studio' });
+      await dbInsert('users', { email, password_hash: bcrypt.hashSync(pwd, 10), name: 'Studio', is_admin: true });
       console.log('\n────────────────────────────────────────');
       console.log('  Premier compte personal shopper créé :');
       console.log('  email    :', email);
       console.log('  password :', pwd);
       console.log('  (à changer après la première connexion)');
       console.log('────────────────────────────────────────\n');
+    } else if (!u.is_admin) {
+      await dbUpdate('users', { id: u.id }, { is_admin: true });
     }
   } catch (e) {
     console.error('seed admin error:', e?.message || e);
   }
 })();
+
+/* ═══════════════════════════════════════════ */
+/*           SUPER-ADMIN PLATEFORME            */
+/* ═══════════════════════════════════════════ */
+app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
+  const [shoppers, clients] = await Promise.all([
+    dbList('users', { order: [{ col: 'id', asc: true }] }),
+    dbList('clients', { order: [{ col: 'created_at', asc: false }] }),
+  ]);
+  // counts par shopper
+  const byShopper = {};
+  clients.forEach(c => { byShopper[c.user_id] = (byShopper[c.user_id] || 0) + 1; });
+  // ratings agrégés
+  const ratings = await ratingsFor(shoppers.map(s => s.id));
+  // items count global
+  const { count: itemsCount } = await sb.from('items').select('id', { count: 'exact', head: true }).is('deleted_at', null);
+  const { count: ratingsCount } = await sb.from('shopper_ratings').select('id', { count: 'exact', head: true });
+
+  const shopperRows = shoppers.map(s => ({
+    id: s.id, email: s.email, name: s.name, studio_name: s.studio_name,
+    is_admin: !!s.is_admin, is_public: !!s.is_public, public_slug: s.public_slug,
+    public_city: s.public_city, specialties: s.specialties, years_experience: s.years_experience,
+    clients_count: byShopper[s.id] || 0,
+    rating_avg: ratings[s.id]?.avg ?? null, rating_count: ratings[s.id]?.count ?? 0,
+    created_at: s.created_at,
+  }));
+  const shopperName = {};
+  shoppers.forEach(s => shopperName[s.id] = s.studio_name || s.name || s.email);
+  const clientRows = clients.map(c => ({
+    id: c.id, name: c.name, email: c.email, slug: c.slug,
+    shopper_id: c.user_id, shopper_name: shopperName[c.user_id] || '—',
+    claimed: !!c.claimed_at, created_at: c.created_at,
+  }));
+  res.json({
+    stats: {
+      shoppers: shoppers.length, public_shoppers: shoppers.filter(s => s.is_public).length,
+      clients: clients.length, claimed_clients: clients.filter(c => c.claimed_at).length,
+      items: itemsCount || 0, ratings: ratingsCount || 0,
+    },
+    shoppers: shopperRows,
+    clients: clientRows,
+  });
+}));
+
+app.put('/api/admin/shopper/:id/public', requireAdmin, ah(async (req, res) => {
+  const next = !!req.body?.is_public;
+  await dbUpdate('users', { id: req.params.id }, { is_public: next });
+  res.json({ ok: true, is_public: next });
+}));
+
+app.delete('/api/admin/shopper/:id', requireAdmin, ah(async (req, res) => {
+  if (+req.params.id === req.session.userId) return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte admin.' });
+  const u = await dbFirst('users', { id: req.params.id }, { select: 'is_admin' });
+  if (u?.is_admin) return res.status(400).json({ error: 'Impossible de supprimer un autre admin.' });
+  await dbDelete('users', { id: req.params.id });
+  res.json({ ok: true });
+}));
+
+app.delete('/api/admin/client/:id', requireAdmin, ah(async (req, res) => {
+  await dbDelete('clients', { id: req.params.id });
+  res.json({ ok: true });
+}));
 
 /* ═══════════════════════════════════════════ */
 /*               AUTH SHOPPER                  */
@@ -203,7 +274,7 @@ app.post('/api/auth/signup', ah(async (req, res) => {
 }));
 app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 
-const USER_PUBLIC_SELECT = 'id, email, name, studio_name, studio_logo, accent_color, photo_url, bio, portfolio, specialties, years_experience, is_public, public_slug, public_tagline, public_city';
+const USER_PUBLIC_SELECT = 'id, email, name, studio_name, studio_logo, accent_color, photo_url, bio, portfolio, specialties, years_experience, is_public, public_slug, public_tagline, public_city, is_admin';
 
 app.get('/api/me', requireAuth, ah(async (req, res) => {
   const u = await dbFirst('users', { id: req.session.userId }, { select: USER_PUBLIC_SELECT });
@@ -1779,6 +1850,7 @@ app.post('/api/tryon', requireAuth, ah(async (req, res) => {
 /* ═══════════════════════════════════════════ */
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/admin/platform', (req, res) => res.sendFile(path.join(__dirname, 'public', 'platform.html')));
 app.get('/admin/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/admin/templates', (req, res) => res.sendFile(path.join(__dirname, 'public', 'templates.html')));
 app.get('/admin/inbox', (req, res) => res.sendFile(path.join(__dirname, 'public', 'inbox.html')));
