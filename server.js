@@ -208,6 +208,7 @@ app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
   shoppers.forEach(s => shopperName[s.id] = s.studio_name || s.name || s.email);
   const clientRows = clients.map(c => ({
     id: c.id, name: c.name, email: c.email, slug: c.slug,
+    access_code: codeFromSlug(c.slug),
     shopper_id: c.user_id, shopper_name: shopperName[c.user_id] || '—',
     claimed: !!c.claimed_at, created_at: c.created_at,
   }));

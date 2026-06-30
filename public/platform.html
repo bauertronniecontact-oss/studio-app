@@ -99,7 +99,7 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
             <input class="pf-search" id="searchClients" placeholder="🔎 Rechercher un client…">
           </div>
           <table class="pf-table"><thead><tr>
-            <th>Nom</th><th>Email</th><th>Styliste</th><th>Statut</th><th></th>
+            <th>Nom</th><th>Email</th><th>Styliste</th><th>Code d'accès</th><th>Statut</th><th></th>
           </tr></thead><tbody id="clientsBody"></tbody></table>
         </div>
       </div>`;
@@ -158,12 +158,13 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
         <td><span class="pf-name">${esc(c.name||'—')}</span></td>
         <td class="pf-email">${esc(c.email||'—')}</td>
         <td>${esc(c.shopper_name)}</td>
+        <td><code style="font-family:monospace;letter-spacing:1px;background:var(--bg-soft);padding:2px 6px;border-radius:3px;">${esc(c.access_code||'—')}</code></td>
         <td><span class="pf-tag ${c.claimed?'pub':''}">${c.claimed?'Actif':'En attente'}</span></td>
         <td><div class="pf-actions">
-          <a class="pf-btn" href="/c/${esc(c.slug)}" target="_blank">Espace</a>
+          <a class="pf-btn" href="/c/${esc(c.slug)}?code=${esc(c.access_code||'')}" target="_blank">Espace</a>
           <button class="pf-btn danger" data-act="delClient">Supprimer</button>
         </div></td>
-      </tr>`).join('') || '<tr><td colspan="5" class="pf-email" style="padding:20px;">Aucun résultat.</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="6" class="pf-email" style="padding:20px;">Aucun résultat.</td></tr>';
 
     document.querySelectorAll('#clientsBody tr[data-cid]').forEach(tr => {
       const id = +tr.dataset.cid;
