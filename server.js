@@ -199,8 +199,10 @@ app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
   const shopperRows = shoppers.map(s => ({
     id: s.id, email: s.email, name: s.name, studio_name: s.studio_name,
     is_admin: !!s.is_admin, is_public: !!s.is_public, public_slug: s.public_slug,
-    suspended: !!s.suspended, featured: !!s.featured,
+    suspended: !!s.suspended, featured: !!s.featured, plan: s.plan || 'free',
+    portfolio_count: Array.isArray(s.portfolio) ? s.portfolio.length : 0,
     public_city: s.public_city, specialties: s.specialties, years_experience: s.years_experience,
+    public_tagline: s.public_tagline, bio: s.bio,
     clients_count: byShopper[s.id] || 0,
     rating_avg: ratings[s.id]?.avg ?? null, rating_count: ratings[s.id]?.count ?? 0,
     created_at: s.created_at,
@@ -225,6 +227,7 @@ app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
       shoppers: shoppers.length, public_shoppers: shoppers.filter(s => s.is_public).length,
       clients: clients.length, claimed_clients: clients.filter(c => c.claimed_at).length,
       items: itemsCount || 0, ratings: ratingsCount || 0,
+      pro: shoppers.filter(s => (s.plan || 'free') === 'pro').length,
     },
     shoppers: shopperRows,
     clients: clientRows,
@@ -280,6 +283,12 @@ app.put('/api/admin/client/:id/suspend', requireAdmin, ah(async (req, res) => {
 app.put('/api/admin/shopper/:id/featured', requireAdmin, ah(async (req, res) => {
   await dbUpdate('users', { id: req.params.id }, { featured: !!req.body?.featured });
   res.json({ ok: true });
+}));
+// Plan d'abonnement (free | pro)
+app.put('/api/admin/shopper/:id/plan', requireAdmin, ah(async (req, res) => {
+  const plan = req.body?.plan === 'pro' ? 'pro' : 'free';
+  await dbUpdate('users', { id: req.params.id }, { plan });
+  res.json({ ok: true, plan });
 }));
 // Réinitialiser le mot de passe d'un styliste → renvoie un mot de passe temporaire
 app.post('/api/admin/shopper/:id/reset-password', requireAdmin, ah(async (req, res) => {
