@@ -36,9 +36,30 @@
   @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   .stat { background: #fff; border-radius: 18px; padding: 20px; text-align: center; }
   .stat.dark { background: #111; color: #fff; }
+  .stat .ic { width: 44px; height: 44px; border-radius: 50%; background: #f3f2f0; display: grid; place-items: center; margin: 0 auto 13px; }
+  .stat .ic svg { width: 18px; height: 18px; stroke: #111; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .stat.dark .ic { background: rgba(255,255,255,.14); }
+  .stat.dark .ic svg { stroke: #fff; }
   .stat .n { font-size: 30px; line-height: 1; font-weight: 500; }
   .stat .l { font-size: 11px; color: #999; margin-top: 8px; }
   .stat.dark .l { color: rgba(255,255,255,.65); }
+
+  .nav a svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+  .grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  .chart { display: flex; align-items: flex-end; gap: 7px; height: 190px; padding: 16px 4px 0; }
+  .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; height: 100%; justify-content: flex-end; }
+  .chart .bar { width: 70%; max-width: 26px; background: #111; border-radius: 5px 5px 0 0; min-height: 3px; transition: background .15s; }
+  .chart .col:hover .bar { background: #b8915a; }
+  .chart .bl { font-size: 10px; color: #999; }
+  .pend .pi { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-bottom: 1px solid #f0f0f0; }
+  .pend .pi:last-child { border: none; }
+  .pend .pa { width: 34px; height: 34px; border-radius: 50%; background: #f3f2f0; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #555; flex-shrink: 0; }
+  .pend .pn { font-size: 13px; font-weight: 600; }
+  .pend .pe2 { font-size: 11px; color: #999; }
+  .topbtns { display: flex; gap: 8px; }
+  .b.exp { display: inline-flex; align-items: center; gap: 6px; }
 
   .card { background: #fff; border-radius: 20px; padding: 22px 22px; margin-bottom: 18px; }
   .card .ch { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -79,6 +100,17 @@
 var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
 var stars = function(a){ var f=Math.round(a||0),o=''; for(var i=1;i<=5;i++) o+='<span style="color:'+(i<=f?'#b8915a':'#ccc')+'">★</span>'; return o; };
 var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e){ return ''; } };
+var svg = function(p){ return '<svg viewBox="0 0 24 24">'+p+'</svg>'; };
+var IC = {
+  dash: '<path d="M3 9.5L12 3l9 6.5"/><path d="M5 9v11h14V9"/>',
+  shop: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>',
+  cli:  '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',
+  rev:  '<path d="M12 2l3 6.5 7 .6-5.2 4.6L18.5 21 12 17.3 5.5 21l1.7-7.3L2 9.1l7-.6z"/>',
+  act:  '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+  bag:  '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  exp:  '<path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/>'
+};
 
 (function(){
   var root = document.getElementById('root');
@@ -144,8 +176,8 @@ var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{da
 
   function draw(){
     var initial = ((ME.name||ME.email||'A').charAt(0)||'A').toUpperCase();
-    var nav = [['dash','Tableau de bord'],['shop','Stylistes'],['cli','Clients'],['rev','Avis'],['act','Activité']]
-      .map(function(v){ return '<a data-view="'+v[0]+'" class="'+(view===v[0]?'on':'')+'">'+v[1]+'</a>'; }).join('');
+    var nav = [['dash','Tableau de bord',IC.dash],['shop','Stylistes',IC.shop],['cli','Clients',IC.cli],['rev','Avis',IC.rev],['act','Activité',IC.act]]
+      .map(function(v){ return '<a data-view="'+v[0]+'" class="'+(view===v[0]?'on':'')+'">'+svg(v[2])+'<span>'+v[1]+'</span></a>'; }).join('');
     root.innerHTML =
       '<div class="shell">' +
         '<div class="side">' +
@@ -165,24 +197,47 @@ var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{da
   function mainView(){
     var st = DATA.stats;
     if (view === 'shop') return head('Personal Shoppers', DATA.shoppers.length+' comptes') +
-      '<div class="card"><div class="ch"><div class="cs">Rechercher</div><input class="search" id="qs" placeholder="Nom, email, studio…" value="'+esc(qs)+'"></div>' +
+      '<div class="card"><div class="ch"><input class="search" id="qs" placeholder="Rechercher…" value="'+esc(qs)+'"><button class="b exp" data-a="expShop">'+svg(IC.exp)+'Export CSV</button></div>' +
       '<table><thead><tr><th>Studio</th><th>Email</th><th>Ville</th><th>Clients</th><th>Note</th><th>Statut</th><th></th></tr></thead><tbody id="shopBody">'+shopRows()+'</tbody></table></div>';
     if (view === 'cli') return head('Clients', DATA.clients.length+' comptes') +
-      '<div class="card"><div class="ch"><div class="cs">Rechercher</div><input class="search" id="qc" placeholder="Nom, email, styliste…" value="'+esc(qc)+'"></div>' +
+      '<div class="card"><div class="ch"><input class="search" id="qc" placeholder="Rechercher…" value="'+esc(qc)+'"><button class="b exp" data-a="expCli">'+svg(IC.exp)+'Export CSV</button></div>' +
       '<table><thead><tr><th>Nom</th><th>Email</th><th>Styliste</th><th>Code</th><th>Statut</th><th></th></tr></thead><tbody id="cliBody">'+cliRows()+'</tbody></table></div>';
     if (view === 'rev') return head('Avis', (DATA.reviews||[]).length+' avis') + '<div class="card">'+reviewRows()+'</div>';
     if (view === 'act') return head('Activité récente', 'Derniers comptes créés') + '<div class="card">'+activityRows()+'</div>';
     // dashboard
+    function sc(icon, n, l, dark){ return '<div class="stat'+(dark?' dark':'')+'"><div class="ic">'+svg(icon)+'</div><div class="n serif">'+n+'</div><div class="l">'+l+'</div></div>'; }
     return head('Tableau de bord', 'Vue d\'ensemble de la plateforme') +
       '<div class="stats">' +
-        '<div class="stat"><div class="n serif">'+st.shoppers+'</div><div class="l">Stylistes</div></div>' +
-        '<div class="stat"><div class="n serif">'+st.public_shoppers+'</div><div class="l">Publics</div></div>' +
-        '<div class="stat"><div class="n serif">'+st.clients+'</div><div class="l">Clients</div></div>' +
-        '<div class="stat"><div class="n serif">'+st.claimed_clients+'</div><div class="l">Clients actifs</div></div>' +
-        '<div class="stat"><div class="n serif">'+st.items+'</div><div class="l">Pièces</div></div>' +
-        '<div class="stat"><div class="n serif">'+st.ratings+'</div><div class="l">Avis</div></div>' +
+        sc(IC.shop, st.shoppers, 'Stylistes') +
+        sc(IC.check, st.public_shoppers, 'Publics') +
+        sc(IC.cli, st.clients, 'Clients', true) +
+        sc(IC.check, st.claimed_clients, 'Clients actifs') +
+        sc(IC.bag, st.items, 'Pièces') +
+        sc(IC.rev, st.ratings, 'Avis') +
       '</div>' +
-      '<div class="card"><div class="ch"><h2 class="serif">Activité récente</h2></div>'+activityRows()+'</div>';
+      '<div class="grid2">' +
+        '<div class="card"><div class="ch"><h2 class="serif">Croissance</h2><div class="cs">Nouveaux comptes / mois</div></div>'+chartHtml()+'</div>' +
+        '<div class="card pend"><div class="ch"><h2 class="serif">À valider</h2><div class="cs">Clients en attente</div></div>'+pendingHtml()+'</div>' +
+      '</div>';
+  }
+
+  function chartHtml(){
+    var now = new Date(), months = [];
+    for (var i = 7; i >= 0; i--) { var d = new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ y:d.getFullYear(), m:d.getMonth(), n:0 }); }
+    function bump(at){ if(!at) return; var d=new Date(at); for(var j=0;j<months.length;j++){ if(months[j].y===d.getFullYear()&&months[j].m===d.getMonth()){ months[j].n++; break; } } }
+    DATA.shoppers.forEach(function(s){ bump(s.created_at); });
+    DATA.clients.forEach(function(c){ bump(c.created_at); });
+    var max = Math.max(1, Math.max.apply(null, months.map(function(x){return x.n;})));
+    var nm = ['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
+    return '<div class="chart">'+months.map(function(x){ var h=Math.round(x.n/max*150)+3; return '<div class="col" title="'+x.n+' compte(s)"><div class="bar" style="height:'+h+'px"></div><div class="bl">'+nm[x.m]+'</div></div>'; }).join('')+'</div>';
+  }
+  function pendingHtml(){
+    var p = DATA.clients.filter(function(c){ return !c.claimed; }).slice(0, 6);
+    if (!p.length) return '<div class="empty">Aucun client en attente.</div>';
+    return p.map(function(c){
+      var ini = ((c.name||'?').charAt(0)||'?').toUpperCase();
+      return '<div class="pi"><div class="pa">'+ini+'</div><div style="flex:1;min-width:0"><div class="pn">'+esc(c.name||'—')+'</div><div class="pe2">'+esc(c.shopper_name)+'</div></div><span class="pill">En attente</span></div>';
+    }).join('');
   }
 
   // Délégation : un seul listener pour toutes les actions
@@ -193,6 +248,8 @@ var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{da
     var a = el.dataset.a, id = el.dataset.id;
     var s = id && DATA ? DATA.shoppers.find(function(x){return x.id==id;}) : null;
     var c = id && DATA ? DATA.clients.find(function(x){return x.id==id;}) : null;
+    if (a==='expShop') { exportCsv('stylistes', ['Studio','Nom','Email','Ville','Clients','Note','Public','Suspendu'], DATA.shoppers.map(function(s){ return [s.studio_name,s.name,s.email,s.public_city,s.clients_count,s.rating_count?s.rating_avg.toFixed(1):'',s.is_public?'oui':'non',s.suspended?'oui':'non']; })); return; }
+    if (a==='expCli') { exportCsv('clients', ['Nom','Email','Styliste','Code','Actif','Suspendu'], DATA.clients.map(function(c){ return [c.name,c.email,c.shopper_name,c.access_code,c.claimed?'oui':'non',c.suspended?'oui':'non']; })); return; }
     if (a==='logout') { fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login'; }); }
     else if (a==='manage') { fetch('/api/admin/impersonate/'+id,{method:'POST'}).then(function(r){ if(r.ok) location.href='/admin'; else alert('Erreur'); }); }
     else if (a==='pub') { fetch('/api/admin/shopper/'+id+'/public',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_public:!s.is_public})}).then(function(r){ if(r.ok){ s.is_public=!s.is_public; refreshShop(); } }); }
@@ -207,6 +264,12 @@ var fdate = function(d){ try { return new Date(d).toLocaleDateString('fr-FR',{da
   });
   function refreshShop(){ var t=document.getElementById('shopBody'); if(t) t.innerHTML = shopRows(); }
   function refreshCli(){ var t=document.getElementById('cliBody'); if(t) t.innerHTML = cliRows(); }
+  function exportCsv(name, headers, rows){
+    var cell = function(v){ v = v==null?'':String(v); return /[",;\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+    var csv = headers.join(';') + '\n' + rows.map(function(r){ return r.map(cell).join(';'); }).join('\n');
+    var blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'studio-'+name+'.csv'; a.click();
+  }
 })();
 </script>
 </body>
