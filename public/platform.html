@@ -123,6 +123,7 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
         <td>${s.rating_count ? `<span class="pf-stars">${stars(s.rating_avg)}</span> <span class="pf-email">${s.rating_avg.toFixed(1)} (${s.rating_count})</span>` : '<span class="pf-email">—</span>'}</td>
         <td><span class="pf-tag ${s.is_public?'pub':''}">${s.is_public?'Public':'Privé'}</span></td>
         <td><div class="pf-actions">
+          ${s.is_admin ? '' : `<button class="pf-btn" data-act="manage" style="background:var(--ink);color:#fff;border-color:var(--ink);">Gérer le studio</button>`}
           ${s.public_slug ? `<a class="pf-btn" href="/s/${esc(s.public_slug)}" target="_blank">Profil</a>` : ''}
           <button class="pf-btn" data-act="togglePublic">${s.is_public?'Dépublier':'Publier'}</button>
           ${s.is_admin ? '' : '<button class="pf-btn danger" data-act="delShopper">Supprimer</button>'}
@@ -132,6 +133,10 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
     document.querySelectorAll('#shoppersBody tr[data-sid]').forEach(tr => {
       const id = +tr.dataset.sid;
       const s = data.shoppers.find(x => x.id === id);
+      tr.querySelector('[data-act=manage]')?.addEventListener('click', async () => {
+        const r = await fetch(`/api/admin/impersonate/${id}`, { method: 'POST' });
+        if (r.ok) location.href = '/admin'; else alert('Erreur');
+      });
       tr.querySelector('[data-act=togglePublic]')?.addEventListener('click', async () => {
         const r = await fetch(`/api/admin/shopper/${id}/public`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_public: !s.is_public }) });
         if (r.ok) { s.is_public = !s.is_public; renderShoppers(document.getElementById('searchShoppers').value); }

@@ -242,6 +242,21 @@ app.delete('/api/admin/client/:id', requireAdmin, ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Entrer dans le studio d'un shopper (l'admin agit en son nom, accès + édition complète)
+app.post('/api/admin/impersonate/:id', requireAdmin, ah(async (req, res) => {
+  const target = await dbFirst('users', { id: req.params.id }, { select: 'id' });
+  if (!target) return res.sendStatus(404);
+  req.session.adminId = req.session.userId;
+  req.session.userId = target.id;
+  res.json({ ok: true });
+}));
+app.post('/api/admin/stop-impersonate', ah(async (req, res) => {
+  if (!req.session.adminId) return res.status(400).json({ error: 'pas en mode gestion' });
+  req.session.userId = req.session.adminId;
+  delete req.session.adminId;
+  res.json({ ok: true });
+}));
+
 /* ═══════════════════════════════════════════ */
 /*               AUTH SHOPPER                  */
 /* ═══════════════════════════════════════════ */
@@ -284,7 +299,7 @@ async function getIsAdmin(userId) {
 
 app.get('/api/me', requireAuth, ah(async (req, res) => {
   const u = await dbFirst('users', { id: req.session.userId }, { select: USER_PUBLIC_SELECT });
-  if (u) u.is_admin = await getIsAdmin(req.session.userId);
+  if (u) { u.is_admin = await getIsAdmin(req.session.userId); u.impersonating = !!req.session.adminId; }
   res.json(u);
 }));
 app.put('/api/me/settings', requireAuth, ah(async (req, res) => {
