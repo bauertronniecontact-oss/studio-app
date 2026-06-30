@@ -56,7 +56,7 @@ const stars = a => { const f=Math.round(a||0); let o=''; for(let i=1;i<=5;i++) o
   let me;
   try { me = await fetch('/api/me').then(r => r.ok ? r.json() : null); } catch {}
   if (!me) { location.href = '/login'; return; }
-  if (!me.is_admin) { root.innerHTML = '<div class="pf-loading">Accès réservé au super-administrateur.<br><br><a class="pf-back" href="/admin">← Retour à mon studio</a></div>'; return; }
+  if (!me.is_admin) { root.innerHTML = '<div class="pf-loading">Accès réservé à l\'administrateur.<br><br><a class="pf-back" href="/admin">← Retour à mon studio</a></div>'; return; }
 
   let data;
   try { data = await fetch('/api/admin/overview').then(r => r.json()); }

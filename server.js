@@ -180,7 +180,7 @@ const requireAdmin = ah(async (req, res, next) => {
 })();
 
 /* ═══════════════════════════════════════════ */
-/*           SUPER-ADMIN PLATEFORME            */
+/*            ADMIN PLATEFORME                 */
 /* ═══════════════════════════════════════════ */
 app.get('/api/admin/overview', requireAdmin, ah(async (req, res) => {
   const [shoppers, clients] = await Promise.all([
