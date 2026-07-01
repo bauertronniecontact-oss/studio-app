@@ -3,8 +3,67 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store">
 <title>Studio — Profil public</title>
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .pb-layout { display: grid; grid-template-columns: 1fr 400px; gap: 34px; align-items: start; }
+  @media (max-width: 1000px) { .pb-layout { grid-template-columns: 1fr; } .pb-preview { position: static !important; } }
+
+  /* Jauge de complétion */
+  .pb-meter { background: var(--bg-soft); border: 1px solid var(--hairline); border-radius: 4px; padding: 16px 18px; margin-bottom: 22px; }
+  .pb-meter .m-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .pb-meter .m-t { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--ink-soft); }
+  .pb-meter .m-pct { font-size: 22px; font-weight: 600; }
+  .pb-meter .m-bar { height: 7px; background: var(--hairline); border-radius: 4px; overflow: hidden; }
+  .pb-meter .m-fill { height: 100%; background: var(--accent); transition: width .3s; }
+  .pb-meter .m-hint { font-size: 12px; color: var(--muted); margin-top: 8px; font-style: italic; font-family: 'Cormorant Garamond', serif; }
+
+  .pb-step { border: 1px solid var(--hairline); border-radius: 6px; padding: 20px 22px; margin-bottom: 16px; background: #fff; }
+  .pb-step .s-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .pb-step .s-num { width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .pb-step .s-num.done { background: var(--accent); }
+  .pb-step h3 { font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 400; }
+  .pb-step .s-sub { font-size: 12px; color: var(--muted); }
+
+  /* Grosse zone de dépôt */
+  .pb-drop { border: 2px dashed var(--hairline-strong); border-radius: 6px; padding: 26px; text-align: center; cursor: pointer; transition: background .2s, border-color .2s; background: var(--bg-soft); }
+  .pb-drop.over { background: rgba(184,145,90,.08); border-color: var(--accent); }
+  .pb-drop .d-ic { font-size: 26px; color: var(--muted); }
+  .pb-drop .d-t { font-family: 'Cormorant Garamond', serif; font-style: italic; color: var(--ink-soft); font-size: 15px; margin-top: 4px; }
+  .pb-drop .d-s { font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-top: 4px; }
+  .pb-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+  @media (max-width: 560px) { .pb-grid { grid-template-columns: repeat(3, 1fr); } }
+  .pb-img { position: relative; aspect-ratio: 3/4; background: var(--visual); border-radius: 3px; overflow: hidden; cursor: grab; }
+  .pb-img img { width: 100%; height: 100%; object-fit: cover; }
+  .pb-img.dragging { opacity: .4; }
+  .pb-img .rm { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border: none; background: rgba(255,255,255,.92); border-radius: 50%; cursor: pointer; font-size: 13px; display: grid; place-items: center; }
+  .pb-img .rm:hover { background: #b03030; color: #fff; }
+  .pb-img .cover { position: absolute; bottom: 5px; left: 5px; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; background: var(--ink); color: #fff; padding: 2px 6px; border-radius: 2px; }
+
+  /* Aperçu live */
+  .pb-preview { position: sticky; top: 20px; }
+  .pv-label { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; text-align: center; }
+  .pv-card { background: #fff; border: 1px solid var(--hairline); border-radius: 8px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.06); }
+  .pv-cover { height: 118px; background: var(--visual); position: relative; }
+  .pv-cover .pv-badge { position: absolute; top: 10px; right: 10px; font-size: 10px; letter-spacing: .06em; padding: 3px 9px; border-radius: 12px; background: rgba(255,255,255,.92); }
+  .pv-badge.pub { background: var(--accent); color: #fff; }
+  .pv-photo { width: 72px; height: 72px; border-radius: 50%; border: 3px solid #fff; background: var(--bg-soft); position: absolute; left: 22px; bottom: -34px; overflow: hidden; display: grid; place-items: center; font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--muted); }
+  .pv-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .pv-body { padding: 44px 22px 22px; }
+  .pv-studio { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+  .pv-name { font-family: 'Cormorant Garamond', serif; color: var(--ink-soft); font-size: 15px; }
+  .pv-tagline { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 16px; color: var(--ink-soft); margin-top: 10px; line-height: 1.4; }
+  .pv-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .pv-tag { font-size: 10px; letter-spacing: .04em; padding: 4px 9px; border: 1px solid var(--hairline-strong); border-radius: 12px; color: var(--ink-soft); }
+  .pv-port { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 14px; }
+  .pv-port .t { aspect-ratio: 1/1; background: var(--visual); border-radius: 2px; overflow: hidden; }
+  .pv-port .t img { width: 100%; height: 100%; object-fit: cover; }
+  .pv-bio { font-size: 12.5px; color: var(--ink-soft); line-height: 1.55; margin-top: 14px; }
+  .pv-empty { color: var(--muted); font-style: italic; }
+
+  .pb-save { display: flex; gap: 12px; align-items: center; margin-top: 4px; position: sticky; bottom: 0; background: var(--bg); padding: 14px 0; }
+</style>
 </head>
 <body>
 <div class="admin-shell">
@@ -29,127 +88,168 @@
   const $ = s => document.querySelector(s);
 
   let me = await api('/api/me');
-  if (me.studio_logo) $('#sideMark').innerHTML = '<span class="logo">'+esc(me.studio_logo)+'</span>'+esc((me.studio_name||'STUDIO').toUpperCase());
-  else if (me.studio_name) $('#sideMark').innerHTML = '<span class="logo">'+esc((me.studio_name[0]||'S').toUpperCase())+'</span>'+esc(me.studio_name.toUpperCase());
+  if (me.studio_name) $('#sideMark').innerHTML = '<span class="logo">'+esc(me.studio_logo||(me.studio_name[0]||'S').toUpperCase())+'</span>'+esc(me.studio_name.toUpperCase());
 
-  const main = document.getElementById('main');
-  let portfolioUrls = Array.isArray(me.portfolio) ? [...me.portfolio] : [];
+  let port = Array.isArray(me.portfolio) ? [...me.portfolio] : [];
+  // état local des champs
+  const S = {
+    is_public: !!me.is_public, public_slug: me.public_slug||'', public_city: me.public_city||'',
+    name: me.name||'', years_experience: me.years_experience||'', photo_url: me.photo_url||'',
+    public_tagline: me.public_tagline||'', specialties: me.specialties||'', bio: me.bio||'',
+    studio_name: me.studio_name||''
+  };
+  const specsArr = () => S.specialties.split(',').map(x=>x.trim()).filter(Boolean);
 
-  function render(){
-    main.innerHTML = `
-      <div class="admin-head" style="margin-bottom:26px;">
-        <div>
-          <h2 style="font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:400;">Ma page <em>portfolio</em></h2>
-          <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);margin-top:2px;">Votre vitrine publique dans l'annuaire des stylistes</div>
-        </div>
-        <a class="btn btn-ghost" id="previewLink" href="${me.public_slug ? '/s/'+esc(me.public_slug) : '#'}" target="_blank" ${me.public_slug?'':'style="pointer-events:none;opacity:.5"'}>Voir ma page publique ↗</a>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <h3>Visibilité</h3>
-          <label class="toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="isPublic" ${me.is_public?'checked':''}>
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-label">Visible dans <code>/discover</code></span>
-          </label>
-        </div>
-        <div class="form-row">
-          <div class="field" style="grid-column:span 2"><label>Adresse publique (slug)</label>
-            <input id="slug" value="${esc(me.public_slug||'')}" placeholder="marie-dupont" pattern="[a-z0-9-]+">
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;font-family:'Cormorant Garamond',serif;">${location.origin}/s/<span id="slugEcho">${esc(me.public_slug||'…')}</span></div>
-          </div>
-          <div class="field"><label>Ville</label><input id="city" value="${esc(me.public_city||'')}" placeholder="Genève"></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><h3>Présentation</h3></div>
-        <div class="form-row">
-          <div class="field"><label>Votre nom</label><input id="name" value="${esc(me.name||'')}"></div>
-          <div class="field"><label>Années d'expérience</label><input id="years" type="number" min="0" max="60" value="${esc(me.years_experience||'')}"></div>
-          <div class="field"><label>Photo (URL)</label><input id="photo" type="url" value="${esc(me.photo_url||'')}" placeholder="https://…"></div>
-        </div>
-        <div class="field" style="margin-top:12px;"><label>Phrase d'accroche</label>
-          <input id="tagline" value="${esc(me.public_tagline||'')}" maxlength="120" placeholder="Le vestiaire qui vous ressemble.">
-        </div>
-        <div class="field" style="margin-top:12px;"><label>Spécialités (séparées par des virgules)</label>
-          <input id="specialties" value="${esc(me.specialties||'')}" placeholder="Smart casual, Mariage, Hiver…">
-        </div>
-        <div class="field" style="margin-top:12px;"><label>Bio</label>
-          <textarea id="bio" rows="4" placeholder="Quelques mots sur vous, votre approche…">${esc(me.bio||'')}</textarea>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><h3>Portfolio <span style="font-size:12px;color:var(--muted);font-family:Inter;">(jusqu'à 12 images · glissez pour réorganiser)</span></h3></div>
-        <div id="portfolioZone" class="portfolio-zone"></div>
-      </div>
-
-      <div style="display:flex;gap:10px;align-items:center;margin-top:20px;">
-        <button class="btn" id="saveBtn">Enregistrer</button>
-        <span id="saveMsg" style="font-size:12px;font-family:Inter;"></span>
-      </div>
-    `;
-
-    // slug echo
-    $('#slug').addEventListener('input', e => { $('#slugEcho').textContent = e.target.value || '…'; });
-    renderPortfolio();
-    $('#saveBtn').addEventListener('click', save);
+  function completeness(){
+    var checks = [ !!S.photo_url, !!S.public_tagline, !!S.public_city, specsArr().length>=1, !!S.bio, port.length>=3, S.is_public && !!S.public_slug ];
+    var done = checks.filter(Boolean).length;
+    return Math.round(done/checks.length*100);
   }
 
-  function renderPortfolio(){
-    const zone = $('#portfolioZone');
-    zone.innerHTML =
-      portfolioUrls.map((u,i) => `<div class="pf-tile" draggable="true" data-i="${i}"><img src="${esc(u)}" alt="" onerror="this.parentElement.classList.add('broken');"><button type="button" class="pf-rm" data-rm="${i}">×</button></div>`).join('') +
-      (portfolioUrls.length < 12 ? `<label class="pf-add"><input type="file" accept="image/*" multiple style="display:none;" id="pfFile"><span>+</span><small>Ajouter</small></label>` : '');
-    zone.querySelectorAll('.pf-rm').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); portfolioUrls.splice(+b.dataset.rm,1); renderPortfolio(); }));
-    const fi = zone.querySelector('#pfFile');
-    if (fi) fi.addEventListener('change', async e => {
-      const files = Array.from(e.target.files||[]);
-      for (const f of files) { if (portfolioUrls.length>=12) break;
-        try { const fd = new FormData(); fd.append('file', f); const r = await fetch('/api/upload',{method:'POST',body:fd}); if(r.ok){ const {url}=await r.json(); portfolioUrls.push(url); renderPortfolio(); } } catch {}
-      }
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="admin-head" style="margin-bottom:22px;">
+      <div>
+        <h2 style="font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:400;">Créez votre <em>portfolio</em></h2>
+        <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);margin-top:2px;">Votre vitrine dans l'annuaire des stylistes — remplissez, ça se met à jour à droite.</div>
+      </div>
+      <a class="btn btn-ghost" id="previewLink" href="${me.public_slug?'/s/'+esc(me.public_slug):'#'}" target="_blank" ${me.public_slug?'':'style="pointer-events:none;opacity:.5"'}>Ouvrir en grand ↗</a>
+    </div>
+
+    <div class="pb-layout">
+      <div>
+        <div class="pb-meter">
+          <div class="m-top"><span class="m-t">Profil complété</span><span class="m-pct" id="pct">0%</span></div>
+          <div class="m-bar"><div class="m-fill" id="fill" style="width:0%"></div></div>
+          <div class="m-hint" id="hint"></div>
+        </div>
+
+        <div class="pb-step">
+          <div class="s-head"><div class="s-num" id="n1">1</div><div><h3>Vous</h3><div class="s-sub">Qui verront vos futurs clients</div></div></div>
+          <div class="form-row">
+            <div class="field"><label>Votre nom</label><input data-f="name" value="${esc(S.name)}"></div>
+            <div class="field"><label>Ville</label><input data-f="public_city" value="${esc(S.public_city)}" placeholder="Genève"></div>
+            <div class="field"><label>Années d'expérience</label><input data-f="years_experience" type="number" min="0" max="60" value="${esc(S.years_experience)}"></div>
+          </div>
+          <div class="field" style="margin-top:12px;"><label>Photo de profil (URL)</label><input data-f="photo_url" type="url" value="${esc(S.photo_url)}" placeholder="https://…"></div>
+        </div>
+
+        <div class="pb-step">
+          <div class="s-head"><div class="s-num" id="n2">2</div><div><h3>Votre univers</h3><div class="s-sub">Accroche, spécialités et présentation</div></div></div>
+          <div class="field"><label>Phrase d'accroche</label><input data-f="public_tagline" maxlength="120" value="${esc(S.public_tagline)}" placeholder="Le vestiaire qui vous ressemble."></div>
+          <div class="field" style="margin-top:12px;"><label>Spécialités (séparées par des virgules)</label><input data-f="specialties" value="${esc(S.specialties)}" placeholder="Smart casual, Mariage, Hiver…"></div>
+          <div class="field" style="margin-top:12px;"><label>Bio</label><textarea data-f="bio" rows="4" placeholder="Votre approche, ce qui vous distingue…">${esc(S.bio)}</textarea></div>
+        </div>
+
+        <div class="pb-step">
+          <div class="s-head"><div class="s-num" id="n3">3</div><div><h3>Portfolio</h3><div class="s-sub">Vos plus belles réalisations — jusqu'à 12 images</div></div></div>
+          <div class="pb-drop" id="drop"><div class="d-ic">↑</div><div class="d-t">Glissez vos images ici, ou cliquez</div><div class="d-s">JPG · PNG · max 12</div><input type="file" id="file" accept="image/*" multiple style="display:none;"></div>
+          <div class="pb-grid" id="grid"></div>
+        </div>
+
+        <div class="pb-step">
+          <div class="s-head"><div class="s-num" id="n4">4</div><div><h3>Publication</h3><div class="s-sub">Rendez votre profil visible dans /discover</div></div></div>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px;">
+            <input type="checkbox" data-f="is_public" ${S.is_public?'checked':''} style="width:18px;height:18px;">
+            <span style="font-size:14px;">Rendre mon profil <strong>public</strong> dans l'annuaire</span>
+          </label>
+          <div class="field"><label>Adresse publique</label>
+            <input data-f="public_slug" value="${esc(S.public_slug)}" placeholder="marie-dupont" pattern="[a-z0-9-]+">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;font-family:'Cormorant Garamond',serif;">${location.origin}/s/<span id="slugEcho">${esc(S.public_slug||'votre-nom')}</span></div>
+          </div>
+        </div>
+
+        <div class="pb-save">
+          <button class="btn" id="saveBtn">Enregistrer mon portfolio</button>
+          <span id="msg" style="font-size:12px;font-family:Inter;"></span>
+        </div>
+      </div>
+
+      <div class="pb-preview">
+        <div class="pv-label">Aperçu en direct</div>
+        <div class="pv-card" id="pv"></div>
+      </div>
+    </div>`;
+
+  // Bind champs
+  document.querySelectorAll('[data-f]').forEach(el => {
+    const f = el.dataset.f;
+    const ev = el.type==='checkbox' ? 'change' : 'input';
+    el.addEventListener(ev, () => { S[f] = el.type==='checkbox' ? el.checked : el.value; if(f==='public_slug'){ $('#slugEcho').textContent = el.value||'votre-nom'; } update(); });
+  });
+
+  function renderGrid(){
+    const grid = $('#grid');
+    grid.innerHTML = port.map((u,i)=>`<div class="pb-img" draggable="true" data-i="${i}"><img src="${esc(u)}" onerror="this.parentElement.style.display='none'"><button class="rm" data-rm="${i}">×</button>${i===0?'<span class="cover">Couverture</span>':''}</div>`).join('');
+    grid.querySelectorAll('.rm').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();port.splice(+b.dataset.rm,1);renderGrid();update();}));
+    let di=null;
+    grid.querySelectorAll('.pb-img').forEach(t=>{
+      t.addEventListener('dragstart',()=>{di=+t.dataset.i;t.classList.add('dragging');});
+      t.addEventListener('dragend',()=>t.classList.remove('dragging'));
+      t.addEventListener('dragover',e=>e.preventDefault());
+      t.addEventListener('drop',e=>{e.preventDefault();const ti=+t.dataset.i;if(di===null||di===ti)return;const it=port.splice(di,1)[0];port.splice(ti,0,it);renderGrid();update();});
     });
-    let dragI = null;
-    zone.querySelectorAll('.pf-tile').forEach(t => {
-      t.addEventListener('dragstart', () => { dragI = +t.dataset.i; t.classList.add('dragging'); });
-      t.addEventListener('dragend', () => t.classList.remove('dragging'));
-      t.addEventListener('dragover', e => e.preventDefault());
-      t.addEventListener('drop', e => { e.preventDefault(); const ti=+t.dataset.i; if(dragI===null||dragI===ti) return; const it=portfolioUrls.splice(dragI,1)[0]; portfolioUrls.splice(ti,0,it); renderPortfolio(); });
-    });
+  }
+  async function addFiles(files){
+    for (const f of Array.from(files||[])) { if(port.length>=12)break;
+      try { const fd=new FormData();fd.append('file',f);const r=await fetch('/api/upload',{method:'POST',body:fd});if(r.ok){const {url}=await r.json();port.push(url);renderGrid();update();} } catch{}
+    }
+  }
+  const drop=$('#drop'), file=$('#file');
+  drop.addEventListener('click',()=>file.click());
+  file.addEventListener('change',e=>{addFiles(e.target.files);file.value='';});
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+  drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');addFiles(e.dataTransfer.files);});
+
+  function renderPreview(){
+    const specs = specsArr();
+    const initial = ((S.studio_name||S.name||'S').trim()[0]||'S').toUpperCase();
+    $('#pv').innerHTML = `
+      <div class="pv-cover">
+        <div class="pv-badge ${S.is_public?'pub':''}">${S.is_public?'PUBLIC':'PRIVÉ'}</div>
+        <div class="pv-photo">${S.photo_url?`<img src="${esc(S.photo_url)}" onerror="this.remove()">`:initial}</div>
+      </div>
+      <div class="pv-body">
+        <div class="pv-studio">${esc((S.studio_name||'Votre studio').toUpperCase())}</div>
+        <div class="pv-name">${esc(S.name||'')}${S.public_city?' · '+esc(S.public_city):''}${S.years_experience?' · '+S.years_experience+' ans':''}</div>
+        <div class="pv-tagline ${S.public_tagline?'':'pv-empty'}">${S.public_tagline?'"'+esc(S.public_tagline)+'"':'Votre phrase d\'accroche apparaîtra ici'}</div>
+        ${specs.length?`<div class="pv-tags">${specs.slice(0,6).map(t=>`<span class="pv-tag">${esc(t)}</span>`).join('')}</div>`:''}
+        ${port.length?`<div class="pv-port">${port.slice(0,6).map(u=>`<div class="t"><img src="${esc(u)}" onerror="this.remove()"></div>`).join('')}</div>`:''}
+        <div class="pv-bio ${S.bio?'':'pv-empty'}">${S.bio?esc(S.bio):'Votre bio apparaîtra ici.'}</div>
+      </div>`;
+  }
+
+  function update(){
+    renderPreview();
+    const p = completeness();
+    $('#pct').textContent = p+'%'; $('#fill').style.width = p+'%';
+    // étapes cochées
+    $('#n1').classList.toggle('done', !!S.photo_url && !!S.public_city);
+    $('#n2').classList.toggle('done', !!S.public_tagline && specsArr().length>0 && !!S.bio);
+    $('#n3').classList.toggle('done', port.length>=3);
+    $('#n4').classList.toggle('done', S.is_public && !!S.public_slug);
+    const hints=[]; if(!S.photo_url)hints.push('ajoutez une photo'); if(port.length<3)hints.push('mettez au moins 3 visuels'); if(!S.public_tagline)hints.push('une phrase d\'accroche'); if(S.is_public&&!S.public_slug)hints.push('une adresse publique');
+    $('#hint').textContent = hints.length ? 'Pour compléter : '+hints.slice(0,2).join(', ')+'.' : '✓ Votre portfolio est complet !';
   }
 
   async function save(){
-    const msg = $('#saveMsg');
-    const slug = $('#slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
-    const body = {
-      is_public: $('#isPublic').checked,
-      public_slug: slug,
-      public_city: $('#city').value.trim(),
-      name: $('#name').value.trim(),
-      years_experience: $('#years').value ? parseInt($('#years').value,10) : null,
-      photo_url: $('#photo').value.trim(),
-      public_tagline: $('#tagline').value.trim(),
-      specialties: $('#specialties').value.trim(),
-      bio: $('#bio').value.trim(),
-      portfolio: portfolioUrls,
-    };
-    if (body.is_public && !slug) { msg.textContent = '✗ Ajoutez une adresse (slug) pour être visible.'; msg.style.color = '#b03030'; return; }
-    $('#saveBtn').disabled = true; msg.textContent = 'Enregistrement…'; msg.style.color = 'var(--muted)';
+    const msg=$('#msg');
+    const slug=(S.public_slug||'').toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+    if (S.is_public && !slug) { msg.textContent='✗ Ajoutez une adresse pour être visible.'; msg.style.color='#b03030'; return; }
+    const body={ is_public:S.is_public, public_slug:slug, public_city:S.public_city, name:S.name, years_experience:S.years_experience?parseInt(S.years_experience,10):null, photo_url:S.photo_url, public_tagline:S.public_tagline, specialties:S.specialties, bio:S.bio, portfolio:port };
+    $('#saveBtn').disabled=true; msg.textContent='Enregistrement…'; msg.style.color='var(--muted)';
     try {
-      me = await api('/api/me/settings', { method:'PUT', body });
-      portfolioUrls = Array.isArray(me.portfolio) ? [...me.portfolio] : portfolioUrls;
-      msg.textContent = '✓ Enregistré.'; msg.style.color = 'var(--accent)';
-      const pl = $('#previewLink'); if (me.public_slug) { pl.href = '/s/'+me.public_slug; pl.style.pointerEvents=''; pl.style.opacity=''; }
-      $('#slugEcho').textContent = me.public_slug || '…';
-    } catch(e) {
-      msg.textContent = '✗ Erreur (slug déjà pris ?)'; msg.style.color = '#b03030';
-    }
-    $('#saveBtn').disabled = false;
+      me=await api('/api/me/settings',{method:'PUT',body});
+      port=Array.isArray(me.portfolio)?[...me.portfolio]:port; S.public_slug=me.public_slug||slug;
+      msg.textContent='✓ Enregistré.'; msg.style.color='var(--accent)';
+      const pl=$('#previewLink'); if(me.public_slug){pl.href='/s/'+me.public_slug;pl.style.pointerEvents='';pl.style.opacity='';}
+    } catch(e){ msg.textContent='✗ Erreur (adresse déjà prise ?)'; msg.style.color='#b03030'; }
+    $('#saveBtn').disabled=false;
   }
+  $('#saveBtn').addEventListener('click', save);
 
-  render();
+  renderGrid(); update();
 })();
 </script>
 </body>
