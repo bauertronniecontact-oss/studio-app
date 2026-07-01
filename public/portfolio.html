@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Profil public</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-side">
+    <div class="mark" id="sideMark"><span class="logo">S</span>STUDIO</div>
+    <div class="side-label">Navigation</div>
+    <a class="client-row" href="/admin">Sélections</a>
+    <a class="client-row" href="/admin/dashboard">Dashboard</a>
+    <a class="client-row" href="/admin/templates">Templates</a>
+    <a class="client-row" href="/admin/inbox">Boîte de réception</a>
+    <a class="client-row active" href="/admin/portfolio">Profil public</a>
+  </aside>
+  <main class="admin-main" id="main">
+    <div style="padding:40px;text-align:center;color:var(--muted);">Chargement…</div>
+  </main>
+</div>
+
+<script>
+(async function(){
+  const api = async (u, o={}) => { const r = await fetch(u, { headers:{'Content-Type':'application/json'}, ...o, body:o.body?JSON.stringify(o.body):undefined }); if(r.status===401){location.href='/login';throw 0;} if(!r.ok) throw new Error('err'); return r.json(); };
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const $ = s => document.querySelector(s);
+
+  let me = await api('/api/me');
+  if (me.studio_logo) $('#sideMark').innerHTML = '<span class="logo">'+esc(me.studio_logo)+'</span>'+esc((me.studio_name||'STUDIO').toUpperCase());
+  else if (me.studio_name) $('#sideMark').innerHTML = '<span class="logo">'+esc((me.studio_name[0]||'S').toUpperCase())+'</span>'+esc(me.studio_name.toUpperCase());
+
+  const main = document.getElementById('main');
+  let portfolioUrls = Array.isArray(me.portfolio) ? [...me.portfolio] : [];
+
+  function render(){
+    main.innerHTML = `
+      <div class="admin-head" style="margin-bottom:26px;">
+        <div>
+          <h2 style="font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:400;">Ma page <em>portfolio</em></h2>
+          <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--muted);margin-top:2px;">Votre vitrine publique dans l'annuaire des stylistes</div>
+        </div>
+        <a class="btn btn-ghost" id="previewLink" href="${me.public_slug ? '/s/'+esc(me.public_slug) : '#'}" target="_blank" ${me.public_slug?'':'style="pointer-events:none;opacity:.5"'}>Voir ma page publique ↗</a>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Visibilité</h3>
+          <label class="toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="isPublic" ${me.is_public?'checked':''}>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Visible dans <code>/discover</code></span>
+          </label>
+        </div>
+        <div class="form-row">
+          <div class="field" style="grid-column:span 2"><label>Adresse publique (slug)</label>
+            <input id="slug" value="${esc(me.public_slug||'')}" placeholder="marie-dupont" pattern="[a-z0-9-]+">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;font-family:'Cormorant Garamond',serif;">${location.origin}/s/<span id="slugEcho">${esc(me.public_slug||'…')}</span></div>
+          </div>
+          <div class="field"><label>Ville</label><input id="city" value="${esc(me.public_city||'')}" placeholder="Genève"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Présentation</h3></div>
+        <div class="form-row">
+          <div class="field"><label>Votre nom</label><input id="name" value="${esc(me.name||'')}"></div>
+          <div class="field"><label>Années d'expérience</label><input id="years" type="number" min="0" max="60" value="${esc(me.years_experience||'')}"></div>
+          <div class="field"><label>Photo (URL)</label><input id="photo" type="url" value="${esc(me.photo_url||'')}" placeholder="https://…"></div>
+        </div>
+        <div class="field" style="margin-top:12px;"><label>Phrase d'accroche</label>
+          <input id="tagline" value="${esc(me.public_tagline||'')}" maxlength="120" placeholder="Le vestiaire qui vous ressemble.">
+        </div>
+        <div class="field" style="margin-top:12px;"><label>Spécialités (séparées par des virgules)</label>
+          <input id="specialties" value="${esc(me.specialties||'')}" placeholder="Smart casual, Mariage, Hiver…">
+        </div>
+        <div class="field" style="margin-top:12px;"><label>Bio</label>
+          <textarea id="bio" rows="4" placeholder="Quelques mots sur vous, votre approche…">${esc(me.bio||'')}</textarea>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Portfolio <span style="font-size:12px;color:var(--muted);font-family:Inter;">(jusqu'à 12 images · glissez pour réorganiser)</span></h3></div>
+        <div id="portfolioZone" class="portfolio-zone"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;margin-top:20px;">
+        <button class="btn" id="saveBtn">Enregistrer</button>
+        <span id="saveMsg" style="font-size:12px;font-family:Inter;"></span>
+      </div>
+    `;
+
+    // slug echo
+    $('#slug').addEventListener('input', e => { $('#slugEcho').textContent = e.target.value || '…'; });
+    renderPortfolio();
+    $('#saveBtn').addEventListener('click', save);
+  }
+
+  function renderPortfolio(){
+    const zone = $('#portfolioZone');
+    zone.innerHTML =
+      portfolioUrls.map((u,i) => `<div class="pf-tile" draggable="true" data-i="${i}"><img src="${esc(u)}" alt="" onerror="this.parentElement.classList.add('broken');"><button type="button" class="pf-rm" data-rm="${i}">×</button></div>`).join('') +
+      (portfolioUrls.length < 12 ? `<label class="pf-add"><input type="file" accept="image/*" multiple style="display:none;" id="pfFile"><span>+</span><small>Ajouter</small></label>` : '');
+    zone.querySelectorAll('.pf-rm').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); portfolioUrls.splice(+b.dataset.rm,1); renderPortfolio(); }));
+    const fi = zone.querySelector('#pfFile');
+    if (fi) fi.addEventListener('change', async e => {
+      const files = Array.from(e.target.files||[]);
+      for (const f of files) { if (portfolioUrls.length>=12) break;
+        try { const fd = new FormData(); fd.append('file', f); const r = await fetch('/api/upload',{method:'POST',body:fd}); if(r.ok){ const {url}=await r.json(); portfolioUrls.push(url); renderPortfolio(); } } catch {}
+      }
+    });
+    let dragI = null;
+    zone.querySelectorAll('.pf-tile').forEach(t => {
+      t.addEventListener('dragstart', () => { dragI = +t.dataset.i; t.classList.add('dragging'); });
+      t.addEventListener('dragend', () => t.classList.remove('dragging'));
+      t.addEventListener('dragover', e => e.preventDefault());
+      t.addEventListener('drop', e => { e.preventDefault(); const ti=+t.dataset.i; if(dragI===null||dragI===ti) return; const it=portfolioUrls.splice(dragI,1)[0]; portfolioUrls.splice(ti,0,it); renderPortfolio(); });
+    });
+  }
+
+  async function save(){
+    const msg = $('#saveMsg');
+    const slug = $('#slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+    const body = {
+      is_public: $('#isPublic').checked,
+      public_slug: slug,
+      public_city: $('#city').value.trim(),
+      name: $('#name').value.trim(),
+      years_experience: $('#years').value ? parseInt($('#years').value,10) : null,
+      photo_url: $('#photo').value.trim(),
+      public_tagline: $('#tagline').value.trim(),
+      specialties: $('#specialties').value.trim(),
+      bio: $('#bio').value.trim(),
+      portfolio: portfolioUrls,
+    };
+    if (body.is_public && !slug) { msg.textContent = '✗ Ajoutez une adresse (slug) pour être visible.'; msg.style.color = '#b03030'; return; }
+    $('#saveBtn').disabled = true; msg.textContent = 'Enregistrement…'; msg.style.color = 'var(--muted)';
+    try {
+      me = await api('/api/me/settings', { method:'PUT', body });
+      portfolioUrls = Array.isArray(me.portfolio) ? [...me.portfolio] : portfolioUrls;
+      msg.textContent = '✓ Enregistré.'; msg.style.color = 'var(--accent)';
+      const pl = $('#previewLink'); if (me.public_slug) { pl.href = '/s/'+me.public_slug; pl.style.pointerEvents=''; pl.style.opacity=''; }
+      $('#slugEcho').textContent = me.public_slug || '…';
+    } catch(e) {
+      msg.textContent = '✗ Erreur (slug déjà pris ?)'; msg.style.color = '#b03030';
+    }
+    $('#saveBtn').disabled = false;
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

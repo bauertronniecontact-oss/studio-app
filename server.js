@@ -2051,6 +2051,7 @@ app.get('/admin', ah(async (req, res) => {
 }));
 app.get('/admin/platform', (req, res) => { res.set('Cache-Control', 'no-store'); res.sendFile(path.join(__dirname, 'public', 'platform.html')); });
 app.get('/admin/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/admin/portfolio', (req, res) => res.sendFile(path.join(__dirname, 'public', 'portfolio.html')));
 app.get('/admin/templates', (req, res) => res.sendFile(path.join(__dirname, 'public', 'templates.html')));
 app.get('/admin/inbox', (req, res) => res.sendFile(path.join(__dirname, 'public', 'inbox.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
