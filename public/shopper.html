@@ -234,7 +234,8 @@ const starsHtml = (avg) => { const f = Math.round(avg||0); let o=''; for(let i=1
   document.title = `${s.studio_name || s.name || 'Styliste'} — Studio`;
   if (s.accent_color) document.documentElement.style.setProperty('--accent', s.accent_color);
 
-  const portfolio = Array.isArray(s.portfolio) ? s.portfolio.filter(Boolean) : [];
+  const portfolioCols = (function(p){ if(!Array.isArray(p)||!p.length) return []; if(typeof p[0]==='string') return [{title:'',desc:'',images:p.filter(Boolean)}]; return p.map(c=>({title:c.title||'',desc:c.desc||'',images:Array.isArray(c.images)?c.images.filter(Boolean):[]})).filter(c=>c.images.length); })(s.portfolio);
+  const portfolio = portfolioCols.reduce((a,c)=>a.concat(c.images),[]);
   const initial = ((s.studio_name || s.name || '?').trim().charAt(0) || 'S').toUpperCase();
   const specs = (s.specialties || '').split(',').map(x=>x.trim()).filter(Boolean);
 
@@ -265,13 +266,18 @@ const starsHtml = (avg) => { const f = Math.round(avg||0); let o=''; for(let i=1
             <div class="sh-bio">${esc(s.bio)}</div>
           </div>` : ''}
 
-        ${portfolio.length ? `
+        ${portfolioCols.length ? `
           <div class="sh-section">
             <div class="lbl">Portfolio</div>
             <h2>Mon <em>univers</em></h2>
-            <div class="sh-portfolio">
-              ${portfolio.map(u => `<div class="tile"><img src="${esc(u)}" alt="" onerror="this.parentElement.remove();"></div>`).join('')}
-            </div>
+            ${portfolioCols.map(c => `
+              <div class="sh-collection" style="margin-top:26px;">
+                ${c.title ? `<h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;margin-bottom:${c.desc?'4px':'12px'};">${esc(c.title)}</h3>` : ''}
+                ${c.desc ? `<p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink-soft);font-size:15px;line-height:1.5;margin-bottom:14px;max-width:640px;">${esc(c.desc)}</p>` : ''}
+                <div class="sh-portfolio">
+                  ${c.images.map(u => `<div class="tile"><img src="${esc(u)}" alt="" onerror="this.parentElement.remove();"></div>`).join('')}
+                </div>
+              </div>`).join('')}
           </div>` : ''}
 
         ${(s.reviews && s.reviews.length) || s.can_rate ? `

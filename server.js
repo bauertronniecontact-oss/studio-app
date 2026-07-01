@@ -469,7 +469,17 @@ app.put('/api/me/settings', requireAuth, ah(async (req, res) => {
   for (const k of ['studio_name', 'studio_logo', 'accent_color', 'photo_url', 'bio', 'name',
                    'specialties', 'years_experience', 'public_tagline', 'public_city'])
     if (f[k] !== undefined) patch[k] = f[k] === '' ? null : f[k];
-  if (Array.isArray(f.portfolio)) patch.portfolio = f.portfolio.filter(u => u && typeof u === 'string').slice(0, 12);
+  if (Array.isArray(f.portfolio)) {
+    // Accepte l'ancien format (tableau d'URLs) OU les collections {title, desc, images:[]}
+    patch.portfolio = f.portfolio.map(c => {
+      if (typeof c === 'string') return c;
+      return {
+        title: String(c.title || '').slice(0, 80),
+        desc: String(c.desc || '').slice(0, 600),
+        images: Array.isArray(c.images) ? c.images.filter(u => u && typeof u === 'string').slice(0, 12) : []
+      };
+    }).slice(0, 12);
+  }
   if (f.is_public !== undefined) patch.is_public = !!f.is_public;
   // public_slug : généré si demandé et pas déjà défini
   if (f.public_slug !== undefined && f.public_slug.trim()) {
