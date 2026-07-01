@@ -149,12 +149,27 @@ var IC = {
   act:  '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
   bag:  '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
   check:'<path d="M20 6L9 17l-5-5"/>',
-  exp:  '<path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/>'
+  exp:  '<path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/>',
+  log:  '<path d="M8 6h11"/><path d="M8 12h11"/><path d="M8 18h11"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.3-1.3L14 2h-4l-.4 2.5a7 7 0 0 0-2.3 1.3l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .9.1 1.3l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.3 1.3L10 22h4l.4-2.5a7 7 0 0 0 2.3-1.3l2.3 1 2-3.4-2-1.5c.1-.4.1-.9.1-1.3z"/>',
+  back: '<path d="M15 18l-6-6 6-6"/>'
 };
 
 (function(){
   var root = document.getElementById('root');
   var DATA = null, ME = null, qs = '', qc = '', view = 'dash', dashSel = 'shop';
+  var logData = null, setData = null, detail = null;
+  function go(v){
+    view = v; if (window.scrollTo) window.scrollTo(0,0);
+    if (v === 'log' && !logData) { draw(); fetch('/api/admin/log').then(function(r){return r.json();}).then(function(d){ logData = d; if(view==='log') draw(); }); return; }
+    if (v === 'set' && !setData) { draw(); fetch('/api/admin/settings').then(function(r){return r.json();}).then(function(d){ setData = d; if(view==='set') draw(); }); return; }
+    draw();
+  }
+  function openDetail(type, id){
+    detail = { loading: true, type: type };
+    view = 'detail'; draw();
+    fetch('/api/admin/'+type+'/'+id+'/detail').then(function(r){return r.json();}).then(function(d){ detail = { type: type, data: d }; if(view==='detail') draw(); });
+  }
 
   fetch('/api/me').then(function(r){ return r.ok ? r.json() : null; }).then(function(me){
     if (!me) { location.href = '/login'; return; }
@@ -179,7 +194,7 @@ var IC = {
         '<button class="b" data-a="susp" data-id="'+s.id+'">'+(s.suspended?'Réactiver':'Suspendre')+'</button>' +
         '<button class="b" data-a="pwd" data-id="'+s.id+'">Reset</button>' +
         '<button class="b d" data-a="delS" data-id="'+s.id+'">Suppr.</button>';
-      return '<tr><td><span class="nm">'+esc(s.studio_name||s.name||'—')+'</span>'+(s.is_admin?' <span class="pill dark">admin</span>':'')+'</td>' +
+      return '<tr><td><span class="nm" data-detail="shopper" data-id="'+s.id+'" style="cursor:pointer;border-bottom:1px dotted #bbb">'+esc(s.studio_name||s.name||'—')+'</span>'+(s.is_admin?' <span class="pill dark">admin</span>':'')+'</td>' +
         '<td class="em">'+esc(s.email||'—')+'</td><td>'+esc(s.public_city||'—')+'</td><td>'+s.clients_count+'</td><td>'+rt+'</td><td>'+st+'</td><td><div class="acts">'+acts+'</div></td></tr>';
     }).join('');
   }
@@ -188,7 +203,7 @@ var IC = {
     var rows = DATA.clients.filter(function(c){ return !q || (c.name||'').toLowerCase().indexOf(q)>=0 || (c.email||'').toLowerCase().indexOf(q)>=0 || (c.shopper_name||'').toLowerCase().indexOf(q)>=0; });
     if (!rows.length) return '<tr><td colspan="6" class="empty">Aucun résultat.</td></tr>';
     return rows.map(function(c){
-      return '<tr><td><span class="nm">'+esc(c.name||'—')+'</span></td><td class="em">'+esc(c.email||'—')+'</td><td>'+esc(c.shopper_name)+'</td>' +
+      return '<tr><td><span class="nm" data-detail="client" data-id="'+c.id+'" style="cursor:pointer;border-bottom:1px dotted #bbb">'+esc(c.name||'—')+'</span></td><td class="em">'+esc(c.email||'—')+'</td><td>'+esc(c.shopper_name)+'</td>' +
         '<td><span class="code">'+esc(c.access_code||'—')+'</span></td>' +
         '<td><span class="pill '+(c.claimed?'green':'')+'">'+(c.claimed?'Actif':'En attente')+'</span>'+(c.suspended?' <span class="pill red">Suspendu</span>':'')+'</td>' +
         '<td><div class="acts"><a class="b" href="/c/'+esc(c.slug)+'?code='+esc(c.access_code||'')+'" target="_blank">Espace</a>' +
@@ -217,7 +232,7 @@ var IC = {
 
   function draw(){
     var initial = ((ME.name||ME.email||'A').charAt(0)||'A').toUpperCase();
-    var nav = [['dash','Tableau de bord',IC.dash],['shop','Stylistes',IC.shop],['cli','Clients',IC.cli],['rev','Avis',IC.rev],['act','Activité',IC.act]]
+    var nav = [['dash','Tableau de bord',IC.dash],['shop','Stylistes',IC.shop],['cli','Clients',IC.cli],['rev','Avis',IC.rev],['act','Activité',IC.act],['log','Journal',IC.log],['set','Paramètres',IC.gear]]
       .map(function(v){ return '<a data-view="'+v[0]+'" class="'+(view===v[0]?'on':'')+'">'+svg(v[2])+'<span>'+v[1]+'</span></a>'; }).join('');
     root.innerHTML =
       '<div class="shell">' +
@@ -245,6 +260,9 @@ var IC = {
       '<table><thead><tr><th>Nom</th><th>Email</th><th>Styliste</th><th>Code</th><th>Statut</th><th></th></tr></thead><tbody id="cliBody">'+cliRows()+'</tbody></table></div>';
     if (view === 'rev') return head('Avis', (DATA.reviews||[]).length+' avis') + '<div class="card">'+reviewRows()+'</div>';
     if (view === 'act') return head('Activité récente', 'Derniers comptes créés') + '<div class="card">'+activityRows()+'</div>';
+    if (view === 'log') return head('Journal d\'audit', 'Actions administratives') + '<div class="card">'+logRows()+'</div>';
+    if (view === 'set') return head('Paramètres', 'Configuration de la plateforme') + settingsView();
+    if (view === 'detail') return detailView();
     // dashboard — cartes cliquables (sélecteur) : la carte noire pilote le tableau du bas
     function sc(icon, n, l, sel){ var on = sel && dashSel===sel; return '<div class="stat'+(on?' dark':'')+(sel?' clk':'')+'"'+(sel?' data-sel="'+sel+'"':'')+'><div class="ic">'+svg(icon)+'</div><div class="n serif">'+n+'</div><div class="l">'+l+'</div></div>'; }
     return head('Tableau de bord', 'Vue d\'ensemble — cliquez une carte pour voir le détail') +
@@ -330,6 +348,74 @@ var IC = {
     return a.map(function(x){ return '<div class="alert"><span class="ab '+x.c+'"></span><span class="at"><span class="an">'+x.n+'</span> '+x.t+'</span></div>'; }).join('');
   }
 
+  function logRows(){
+    if (!logData) return '<div class="empty">Chargement…</div>';
+    if (!logData.length) return '<div class="empty">Aucune action enregistrée pour l\'instant.</div>';
+    return '<table><thead><tr><th>Quand</th><th>Admin</th><th>Action</th><th>Cible</th><th>Détail</th></tr></thead><tbody>' +
+      logData.map(function(l){
+        var when = ''; try { when = new Date(l.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); } catch(e){}
+        return '<tr><td class="em">'+when+'</td><td class="em">'+esc(l.admin_email||'—')+'</td><td><span class="pill">'+esc(l.label||l.action)+'</span></td><td>'+esc((l.target_type||'')+(l.target_id?' #'+l.target_id:''))+'</td><td class="em">'+esc(l.detail||'')+'</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function settingsView(){
+    if (!setData) return '<div class="card"><div class="empty">Chargement…</div></div>';
+    var s = setData.settings, ig = setData.integrations;
+    var chip = function(ok, txt){ return '<span class="pill '+(ok?'green':'red')+'">'+(ok?'✓ ':'✗ ')+txt+'</span>'; };
+    return '<div class="grid2">' +
+      '<div class="card"><div class="ch"><h2 class="serif">Réglages</h2></div>' +
+        '<div style="display:flex;flex-direction:column;gap:14px">' +
+          '<label style="font-size:13px">Quota d\'imports gratuits / jour<br><input id="setLimit" class="search" style="width:120px;margin-top:6px" value="'+esc(s.scrape_limit_free)+'"></label>' +
+          '<label style="font-size:13px">Prix du plan Pro (€/mois)<br><input id="setPrice" class="search" style="width:120px;margin-top:6px" value="'+esc(s.pro_price)+'"></label>' +
+          '<label style="font-size:13px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="setMaint" '+(s.maintenance==='1'?'checked':'')+'> Mode maintenance</label>' +
+          '<button class="b k" data-a="saveSet" style="align-self:flex-start">Enregistrer</button>' +
+          '<div id="setMsg" class="em"></div>' +
+        '</div></div>' +
+      '<div class="card"><div class="ch"><h2 class="serif">Intégrations</h2></div>' +
+        '<div class="pro-row"><span>ScrapingBee (scraping protégé)</span>'+chip(ig.scrapingbee,'Connecté')+'</div>' +
+        '<div class="pro-row"><span>Stockage Supabase</span>'+chip(ig.supabase_storage, ig.storage_files!=null ? ig.storage_files+' fichiers' : 'Indispo')+'</div>' +
+        '<div class="pro-row"><span>Base de données</span>'+chip(true,'Opérationnelle')+'</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function detailView(){
+    if (!detail || detail.loading) return '<button class="b" data-view="'+(detail&&detail.type==='client'?'cli':'shop')+'">← Retour</button><div class="card"><div class="empty">Chargement…</div></div>';
+    var d = detail.data, isC = detail.type === 'client';
+    var backView = isC ? 'cli' : 'shop';
+    var h = '<button class="b" data-view="'+backView+'" style="margin-bottom:14px">← Retour</button>';
+    if (isC) {
+      return h + head(esc(d.name||'Client'), d.email||'') +
+        '<div class="stats"><div class="stat"><div class="n serif">'+d.items_count+'</div><div class="l">Pièces reçues</div></div>' +
+        '<div class="stat"><div class="n serif">'+d.likes_count+'</div><div class="l">Coups de cœur</div></div>' +
+        '<div class="stat"><div class="n serif">'+(d.claimed?'Oui':'Non')+'</div><div class="l">Actif</div></div></div>' +
+        '<div class="card"><div class="ch"><h2 class="serif">Infos</h2></div>' +
+        '<div class="pro-row"><span>Styliste</span><span>'+esc(d.shopper?d.shopper.name:'—')+'</span></div>' +
+        '<div class="pro-row"><span>Code d\'accès</span><span class="code">'+esc(d.access_code)+'</span></div>' +
+        '<div class="pro-row"><span>Créé le</span><span>'+fdate(d.created_at)+'</span></div>' +
+        '<div class="pro-row"><span>Dernière connexion</span><span>'+(d.last_login_at?fdate(d.last_login_at):'jamais')+'</span></div>' +
+        '<div style="margin-top:12px"><a class="b" href="/c/'+esc(d.slug)+'?code='+esc(d.access_code)+'" target="_blank">Ouvrir son espace →</a></div></div>';
+    }
+    var port = (d.portfolio||[]).slice(0,6).map(function(u){ return '<img src="'+esc(u)+'" style="width:70px;height:88px;object-fit:cover;border-radius:4px" onerror="this.remove()">'; }).join('');
+    return h + head(esc(d.studio_name||d.name||'Styliste'), d.email||'') +
+      '<div class="stats"><div class="stat"><div class="n serif">'+d.clients.length+'</div><div class="l">Clients</div></div>' +
+      '<div class="stat"><div class="n serif">'+d.items_count+'</div><div class="l">Pièces</div></div>' +
+      '<div class="stat"><div class="n serif">'+(d.rating_count?d.rating_avg.toFixed(1):'—')+'</div><div class="l">Note</div></div>' +
+      '<div class="stat"><div class="n serif">'+(d.plan==='pro'?'PRO':'Free')+'</div><div class="l">Plan</div></div></div>' +
+      '<div class="grid2">' +
+      '<div class="card"><div class="ch"><h2 class="serif">Profil</h2></div>' +
+        '<div class="pro-row"><span>Ville</span><span>'+esc(d.public_city||'—')+'</span></div>' +
+        '<div class="pro-row"><span>Public</span><span>'+(d.is_public?'Oui':'Non')+'</span></div>' +
+        '<div class="pro-row"><span>Spécialités</span><span>'+esc(d.specialties||'—')+'</span></div>' +
+        '<div class="pro-row"><span>Créé le</span><span>'+fdate(d.created_at)+'</span></div>' +
+        (port?'<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">'+port+'</div>':'') +
+        (d.public_slug?'<div style="margin-top:12px"><a class="b" href="/s/'+esc(d.public_slug)+'" target="_blank">Voir profil public →</a></div>':'') +
+      '</div>' +
+      '<div class="card"><div class="ch"><h2 class="serif">Ses clients ('+d.clients.length+')</h2></div>' +
+        (d.clients.length ? d.clients.map(function(c){ return '<div class="pro-row"><span class="nm">'+esc(c.name||'—')+'</span><span>'+(c.claimed?'<span class="pill green">Actif</span>':'<span class="pill">En attente</span>')+'</span></div>'; }).join('') : '<div class="empty">Aucun client.</div>') +
+      '</div></div>';
+  }
+
   function dashTable(){
     var sel = dashSel;
     if (sel === 'rev') {
@@ -382,7 +468,9 @@ var IC = {
   // Délégation : un seul listener pour toutes les actions
   document.addEventListener('click', function(e){
     var nv = e.target.closest('[data-view]');
-    if (nv) { e.preventDefault(); view = nv.dataset.view; draw(); window.scrollTo(0,0); return; }
+    if (nv) { e.preventDefault(); go(nv.dataset.view); return; }
+    var dt = e.target.closest('[data-detail]');
+    if (dt) { openDetail(dt.dataset.detail, dt.dataset.id); return; }
     var sel = e.target.closest('[data-sel]');
     if (sel) { dashSel = sel.dataset.sel; draw(); return; }
     var el = e.target.closest('[data-a]'); if (!el) return;
@@ -391,8 +479,13 @@ var IC = {
     var c = id && DATA ? DATA.clients.find(function(x){return x.id==id;}) : null;
     if (a==='expShop') { exportCsv('stylistes', ['Studio','Nom','Email','Ville','Clients','Note','Public','Suspendu'], DATA.shoppers.map(function(s){ return [s.studio_name,s.name,s.email,s.public_city,s.clients_count,s.rating_count?s.rating_avg.toFixed(1):'',s.is_public?'oui':'non',s.suspended?'oui':'non']; })); return; }
     if (a==='expCli') { exportCsv('clients', ['Nom','Email','Styliste','Code','Actif','Suspendu'], DATA.clients.map(function(c){ return [c.name,c.email,c.shopper_name,c.access_code,c.claimed?'oui':'non',c.suspended?'oui':'non']; })); return; }
-    if (a==='goShop') { view='shop'; draw(); window.scrollTo(0,0); return; }
-    if (a==='goCli') { view='cli'; draw(); window.scrollTo(0,0); return; }
+    if (a==='goShop') { go('shop'); return; }
+    if (a==='goCli') { go('cli'); return; }
+    if (a==='saveSet') {
+      var body = { scrape_limit_free: document.getElementById('setLimit').value, pro_price: document.getElementById('setPrice').value, maintenance: document.getElementById('setMaint').checked ? '1' : '0' };
+      fetch('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){ setData=d; var m=document.getElementById('setMsg'); if(m){ m.textContent='✓ Enregistré.'; m.style.color='#2e7d4f'; } });
+      return;
+    }
     if (a==='logout') { fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login'; }); }
     else if (a==='manage') { fetch('/api/admin/impersonate/'+id,{method:'POST'}).then(function(r){ if(r.ok) location.href='/admin'; else alert('Erreur'); }); }
     else if (a==='pub') { fetch('/api/admin/shopper/'+id+'/public',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_public:!s.is_public})}).then(function(r){ if(r.ok){ s.is_public=!s.is_public; refreshShop(); } }); }

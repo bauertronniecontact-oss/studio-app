@@ -157,6 +157,15 @@ const requireAdmin = ah(async (req, res, next) => {
   next();
 });
 
+// Journal d'audit (best-effort : ne bloque jamais l'action si la table n'existe pas)
+async function logAdmin(req, action, targetType, targetId, detail) {
+  try {
+    let email = req._adminEmail;
+    if (!email) { const u = await dbFirst('users', { id: req.session.userId }, { select: 'email' }); email = u?.email || null; req._adminEmail = email; }
+    await dbInsert('admin_log', { admin_id: req.session.userId, admin_email: email, action, target_type: targetType || null, target_id: targetId || null, detail: detail || null });
+  } catch (e) { /* table absente → ignore */ }
+}
+
 /* ─────────── Admin seed ─────────── */
 (async () => {
   try {
@@ -245,19 +254,24 @@ app.delete('/api/admin/shopper/:id', requireAdmin, ah(async (req, res) => {
   if (+req.params.id === req.session.userId) return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte admin.' });
   const u = await dbFirst('users', { id: req.params.id }, { select: 'is_admin' });
   if (u?.is_admin) return res.status(400).json({ error: 'Impossible de supprimer un autre admin.' });
+  const sh = await dbFirst('users', { id: req.params.id }, { select: 'studio_name, name, email' });
   await dbDelete('users', { id: req.params.id });
+  await logAdmin(req, 'delete_shopper', 'shopper', +req.params.id, sh?.studio_name || sh?.name || sh?.email);
   res.json({ ok: true });
 }));
 
 app.delete('/api/admin/client/:id', requireAdmin, ah(async (req, res) => {
+  const cl = await dbFirst('clients', { id: req.params.id }, { select: 'name, email' });
   await dbDelete('clients', { id: req.params.id });
+  await logAdmin(req, 'delete_client', 'client', +req.params.id, cl?.name || cl?.email);
   res.json({ ok: true });
 }));
 
 // Entrer dans le studio d'un shopper (l'admin agit en son nom, accès + édition complète)
 app.post('/api/admin/impersonate/:id', requireAdmin, ah(async (req, res) => {
-  const target = await dbFirst('users', { id: req.params.id }, { select: 'id' });
+  const target = await dbFirst('users', { id: req.params.id }, { select: 'id, studio_name, name' });
   if (!target) return res.sendStatus(404);
+  await logAdmin(req, 'impersonate', 'shopper', target.id, target.studio_name || target.name);
   req.session.adminId = req.session.userId;
   req.session.userId = target.id;
   res.json({ ok: true });
@@ -272,28 +286,35 @@ app.post('/api/admin/stop-impersonate', ah(async (req, res) => {
 // Suspendre / réactiver
 app.put('/api/admin/shopper/:id/suspend', requireAdmin, ah(async (req, res) => {
   if (+req.params.id === req.session.userId) return res.status(400).json({ error: 'Pas sur votre propre compte.' });
-  await dbUpdate('users', { id: req.params.id }, { suspended: !!req.body?.suspended });
+  const on = !!req.body?.suspended;
+  await dbUpdate('users', { id: req.params.id }, { suspended: on });
+  await logAdmin(req, on ? 'suspend_shopper' : 'unsuspend_shopper', 'shopper', +req.params.id);
   res.json({ ok: true });
 }));
 app.put('/api/admin/client/:id/suspend', requireAdmin, ah(async (req, res) => {
-  await dbUpdate('clients', { id: req.params.id }, { suspended: !!req.body?.suspended });
+  const on = !!req.body?.suspended;
+  await dbUpdate('clients', { id: req.params.id }, { suspended: on });
+  await logAdmin(req, on ? 'suspend_client' : 'unsuspend_client', 'client', +req.params.id);
   res.json({ ok: true });
 }));
 // Mise en avant (épinglé en tête de /discover)
 app.put('/api/admin/shopper/:id/featured', requireAdmin, ah(async (req, res) => {
   await dbUpdate('users', { id: req.params.id }, { featured: !!req.body?.featured });
+  await logAdmin(req, req.body?.featured ? 'feature' : 'unfeature', 'shopper', +req.params.id);
   res.json({ ok: true });
 }));
 // Plan d'abonnement (free | pro)
 app.put('/api/admin/shopper/:id/plan', requireAdmin, ah(async (req, res) => {
   const plan = req.body?.plan === 'pro' ? 'pro' : 'free';
   await dbUpdate('users', { id: req.params.id }, { plan });
+  await logAdmin(req, 'set_plan', 'shopper', +req.params.id, plan);
   res.json({ ok: true, plan });
 }));
 // Réinitialiser le mot de passe d'un styliste → renvoie un mot de passe temporaire
 app.post('/api/admin/shopper/:id/reset-password', requireAdmin, ah(async (req, res) => {
   const pwd = nanoid(10);
   await dbUpdate('users', { id: req.params.id }, { password_hash: bcrypt.hashSync(pwd, 10) });
+  await logAdmin(req, 'reset_password', 'shopper', +req.params.id);
   res.json({ ok: true, password: pwd });
 }));
 // Nouveau lien magique pour un client
@@ -310,7 +331,90 @@ app.post('/api/admin/client/:id/magic-link', requireAdmin, ah(async (req, res) =
 // Modérer un avis
 app.delete('/api/admin/rating/:id', requireAdmin, ah(async (req, res) => {
   await dbDelete('shopper_ratings', { id: req.params.id });
+  await logAdmin(req, 'delete_review', 'rating', +req.params.id);
   res.json({ ok: true });
+}));
+
+// ── Journal d'audit ──
+const ADMIN_ACTION_LABELS = {
+  delete_shopper: 'Suppression styliste', delete_client: 'Suppression client', impersonate: 'Gestion studio',
+  suspend_shopper: 'Suspension styliste', unsuspend_shopper: 'Réactivation styliste',
+  suspend_client: 'Suspension client', unsuspend_client: 'Réactivation client',
+  feature: 'Mise en avant', unfeature: 'Retrait mise en avant', set_plan: 'Changement de plan',
+  reset_password: 'Reset mot de passe', delete_review: 'Suppression avis',
+};
+app.get('/api/admin/log', requireAdmin, ah(async (req, res) => {
+  try {
+    const { data } = await sb.from('admin_log').select('*').order('created_at', { ascending: false }).limit(100);
+    res.json((data || []).map(r => ({ ...r, label: ADMIN_ACTION_LABELS[r.action] || r.action })));
+  } catch { res.json([]); }
+}));
+
+// ── Fiche détaillée d'un compte ──
+app.get('/api/admin/shopper/:id/detail', requireAdmin, ah(async (req, res) => {
+  const u = await dbFirst('users', { id: req.params.id });
+  if (!u) return res.sendStatus(404);
+  const clients = await dbList('clients', { where: { user_id: u.id }, order: [{ col: 'created_at', asc: false }] });
+  const { count: items } = await sb.from('items').select('id', { count: 'exact', head: true }).in('client_id', clients.map(c => c.id).length ? clients.map(c => c.id) : [0]).is('deleted_at', null);
+  const ratings = await ratingsFor([u.id]);
+  res.json({
+    id: u.id, email: u.email, name: u.name, studio_name: u.studio_name,
+    is_public: !!u.is_public, public_slug: u.public_slug, public_city: u.public_city,
+    specialties: u.specialties, years_experience: u.years_experience, bio: u.bio,
+    plan: u.plan || 'free', suspended: !!u.suspended, featured: !!u.featured,
+    portfolio: Array.isArray(u.portfolio) ? u.portfolio : [],
+    created_at: u.created_at,
+    rating_avg: ratings[u.id]?.avg ?? null, rating_count: ratings[u.id]?.count ?? 0,
+    items_count: items || 0,
+    clients: clients.map(c => ({ id: c.id, name: c.name, email: c.email, slug: c.slug, claimed: !!c.claimed_at, access_code: codeFromSlug(c.slug) })),
+  });
+}));
+app.get('/api/admin/client/:id/detail', requireAdmin, ah(async (req, res) => {
+  const c = await dbFirst('clients', { id: req.params.id });
+  if (!c) return res.sendStatus(404);
+  const shopper = await dbFirst('users', { id: c.user_id }, { select: 'studio_name, name, email, public_slug' });
+  const { count: items } = await sb.from('items').select('id', { count: 'exact', head: true }).eq('client_id', c.id).is('deleted_at', null);
+  const { count: likes } = await sb.from('items').select('id', { count: 'exact', head: true }).eq('client_id', c.id).eq('liked', true).is('deleted_at', null);
+  res.json({
+    id: c.id, name: c.name, email: c.email, slug: c.slug, access_code: codeFromSlug(c.slug),
+    claimed: !!c.claimed_at, suspended: !!c.suspended, created_at: c.created_at, last_login_at: c.last_login_at,
+    shopper: shopper ? { name: shopper.studio_name || shopper.name, email: shopper.email, slug: shopper.public_slug } : null,
+    items_count: items || 0, likes_count: likes || 0,
+  });
+}));
+
+// ── Paramètres plateforme ──
+async function getSettings() {
+  const defaults = { scrape_limit_free: String(SCRAPE_LIMIT_FREE), pro_price: '29', maintenance: '0' };
+  try {
+    const { data } = await sb.from('platform_settings').select('key, value');
+    (data || []).forEach(r => { defaults[r.key] = r.value; });
+  } catch {}
+  return defaults;
+}
+app.get('/api/admin/settings', requireAdmin, ah(async (req, res) => {
+  const settings = await getSettings();
+  let storageFiles = null;
+  try { const { data } = await sb.storage.from(UPLOAD_BUCKET).list('', { limit: 1000 }); storageFiles = (data || []).length; } catch {}
+  res.json({
+    settings,
+    integrations: {
+      scrapingbee: !!process.env.SCRAPINGBEE_API_KEY,
+      supabase_storage: storageFiles != null,
+      storage_files: storageFiles,
+    },
+  });
+}));
+app.put('/api/admin/settings', requireAdmin, ah(async (req, res) => {
+  const allowed = ['scrape_limit_free', 'pro_price', 'maintenance'];
+  const body = req.body || {};
+  for (const k of allowed) {
+    if (body[k] !== undefined) {
+      await sb.from('platform_settings').upsert({ key: k, value: String(body[k]) }, { onConflict: 'key' });
+    }
+  }
+  await logAdmin(req, 'update_settings', 'settings', null, Object.keys(body).join(','));
+  res.json({ ok: true, settings: await getSettings() });
 }));
 
 /* ═══════════════════════════════════════════ */
